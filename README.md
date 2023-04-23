@@ -15,8 +15,8 @@ The lab has the following learning outcomes with regard to concepts covered in c
 
 ## Information about your submission
 
-1. Name and email: add your name and email here.
-2. Team member name and email: add team member info. say none if this is a solo submission
+1. Name and email: Om Prakash Prajapath oprajapath@umass.edu.
+2. Team member name and email: Sai Vineeth Kumar Dara sdara@umass.edu
 3. Number of late days used for this lab: say zero if none used
 4. Number of late days used so far including this lab: say zero if none used.
 
