@@ -37,6 +37,11 @@ class Handler(BaseHTTPRequestHandler):
             stockname = request_params.get('stockname', [None])[0] #get stockname from query parameters
             response = lookup(stockname) #perform lookup on the stockname
             self._send_response(response) #send http response
+        elif (path == '/orders'):
+            #handle /orders/<order_number> endpoint. Endpoint to get query existing orders
+            order_id =  request_params.get('order-number', [None])[0] #get order number from query parameters
+            response = order_lookup(order_id)
+            self._send_response(response)
         else:
             #Send 404 error for all other paths
             logger.warning(f'Path does not exist : {path}')
@@ -152,6 +157,37 @@ def trade(stockname, quantity, trade_type):
     except Exception as e:
         logger.error(f"Failed to get trade response for {stockname} with exception: {e}")
         return get_http_error_response(404, 'Internal Server Error')
+    
+def order_lookup(order_id):
+    '''
+    Function to query an existing order
+    :param order_id: order id of the order to perform lookup on
+    '''
+    logger.info(f"Performing get request for order: {order_id}")
+    try:
+        #query the order service
+        order_id = int(order_id)
+        hostAddr = config.order_hostname + ':' + str(config.order_port)
+        with grpc.insecure_channel(hostAddr) as channel:
+            stub = stocktrade_pb2_grpc.OrderServiceStub(channel)
+            order_lookup_response = stub.OrderLookup(stocktrade_pb2.OrderLookupRequest(order_id= order_id))
+            logger.info(
+                f"Order lookup request: {order_id}, response: Name of stock: {order_lookup_response.stockname}, type of trade: {order_lookup_response.trade_type}, quantity : {order_lookup_response.quantity}")
+            if order_lookup_response.status == 1:
+                response =  {
+                    'number' : order_lookup_response.order_id,
+                    'name' : order_lookup_response.stockname,
+                    'type' : 'SELL' if order_lookup_response.trade_type == 1 else 'BUY',
+                    'quantity' : order_lookup_response.quantity
+                }
+                return get_http_response(response) #prepare http response
+            else:
+                return get_http_error_response(404, 'order not found') #prepare http error response
+    except Exception as e:
+        logger.error(f"Failed to query order {order_id} with expception: {e}") 
+    return get_http_error_response(404, 'Internal Server Error')
+
+
 
 #TODO: remove the function (not using)
 def save_file():

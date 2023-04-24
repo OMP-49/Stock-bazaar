@@ -27,6 +27,26 @@ class LookupResponse(_message.Message):
     volume: int
     def __init__(self, stockname: _Optional[str] = ..., price: _Optional[float] = ..., volume: _Optional[int] = ...) -> None: ...
 
+class OrderLookupRequest(_message.Message):
+    __slots__ = ["order_id"]
+    ORDER_ID_FIELD_NUMBER: _ClassVar[int]
+    order_id: int
+    def __init__(self, order_id: _Optional[int] = ...) -> None: ...
+
+class OrderLookupResponse(_message.Message):
+    __slots__ = ["order_id", "quantity", "status", "stockname", "trade_type"]
+    ORDER_ID_FIELD_NUMBER: _ClassVar[int]
+    QUANTITY_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    STOCKNAME_FIELD_NUMBER: _ClassVar[int]
+    TRADE_TYPE_FIELD_NUMBER: _ClassVar[int]
+    order_id: int
+    quantity: int
+    status: int
+    stockname: str
+    trade_type: TradeType
+    def __init__(self, order_id: _Optional[int] = ..., status: _Optional[int] = ..., stockname: _Optional[str] = ..., trade_type: _Optional[_Union[TradeType, str]] = ..., quantity: _Optional[int] = ...) -> None: ...
+
 class TradeRequest(_message.Message):
     __slots__ = ["quantity", "stockname", "trade_type"]
     QUANTITY_FIELD_NUMBER: _ClassVar[int]
