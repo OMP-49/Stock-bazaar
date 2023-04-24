@@ -4,6 +4,7 @@ import grpc
 import threading
 import time
 from threading import Lock
+from queue import Queue
 import atexit
 import sys
 sys.path.append('../../..')
@@ -16,6 +17,7 @@ from src.shared.model import order
 stockorders_db = {}     # stock orders db to store all the stock trade requests
 curr_tran = 0           # current transaction number to keep track of transactions
 lock = Lock()           # lock to access the above global variables
+updated_stocks_queue = Queue()             # queue to stream db updates
 
 # Implementing Trade method defined in proto file
 class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
@@ -39,7 +41,8 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
                 stub = stocktrade_pb2_grpc.CatalogServiceStub(channel)
                 response = stub.Update(stocktrade_pb2.UpdateRequest(stockname=name, trade_type=type, quantity=quantity ))
                 logger.info(f"Trade request: {name},{typew},{quantity}, response: status: {response.status}")
-                
+                global updated_stocks_queue
+                updated_stocks_queue.put(name)
                 # if trade is processed correctly, increase the transaction number and save it to in-memory stockorders_db
                 if response.status == 1:
                     with lock:
@@ -80,6 +83,12 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
         except Exception as e:
             logger.error(f"Failed to process lookup request for request : {request} with exception: {e}")
             return stocktrade_pb2.LookupResponse(order_id=order_id, status = -1)
+    
+    def StreamDBUpdates(self, request, context):
+        global updated_stocks_queue
+        while True:
+            if (not updated_stocks_queue.empty()):
+                yield stocktrade_pb2.CacheInvalidateRequest(stockname= updated_stocks_queue.get())          
 
     
     def Save(self, request, context):
