@@ -120,6 +120,11 @@ class OrderServiceStub(object):
                 request_serializer=stocktrade__pb2.OrderLookupRequest.SerializeToString,
                 response_deserializer=stocktrade__pb2.OrderLookupResponse.FromString,
                 )
+        self.StreamDBUpdates = channel.unary_stream(
+                '/OrderService/StreamDBUpdates',
+                request_serializer=stocktrade__pb2.Empty.SerializeToString,
+                response_deserializer=stocktrade__pb2.CacheInvalidateRequest.FromString,
+                )
         self.Save = channel.unary_unary(
                 '/OrderService/Save',
                 request_serializer=stocktrade__pb2.Empty.SerializeToString,
@@ -137,6 +142,12 @@ class OrderServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def OrderLookup(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def StreamDBUpdates(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -160,6 +171,11 @@ def add_OrderServiceServicer_to_server(servicer, server):
                     servicer.OrderLookup,
                     request_deserializer=stocktrade__pb2.OrderLookupRequest.FromString,
                     response_serializer=stocktrade__pb2.OrderLookupResponse.SerializeToString,
+            ),
+            'StreamDBUpdates': grpc.unary_stream_rpc_method_handler(
+                    servicer.StreamDBUpdates,
+                    request_deserializer=stocktrade__pb2.Empty.FromString,
+                    response_serializer=stocktrade__pb2.CacheInvalidateRequest.SerializeToString,
             ),
             'Save': grpc.unary_unary_rpc_method_handler(
                     servicer.Save,
@@ -207,6 +223,23 @@ class OrderService(object):
         return grpc.experimental.unary_unary(request, target, '/OrderService/OrderLookup',
             stocktrade__pb2.OrderLookupRequest.SerializeToString,
             stocktrade__pb2.OrderLookupResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def StreamDBUpdates(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(request, target, '/OrderService/StreamDBUpdates',
+            stocktrade__pb2.Empty.SerializeToString,
+            stocktrade__pb2.CacheInvalidateRequest.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

@@ -7,6 +7,12 @@ BUY: TradeType
 DESCRIPTOR: _descriptor.FileDescriptor
 SELL: TradeType
 
+class CacheInvalidateRequest(_message.Message):
+    __slots__ = ["stockname"]
+    STOCKNAME_FIELD_NUMBER: _ClassVar[int]
+    stockname: str
+    def __init__(self, stockname: _Optional[str] = ...) -> None: ...
+
 class Empty(_message.Message):
     __slots__ = []
     def __init__(self) -> None: ...

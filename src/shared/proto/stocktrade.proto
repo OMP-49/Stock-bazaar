@@ -8,6 +8,7 @@ service CatalogService{
 service OrderService{
     rpc Trade(TradeRequest) returns (TradeResponse) {}
     rpc OrderLookup(OrderLookupRequest) returns (OrderLookupResponse) {}
+    rpc StreamDBUpdates(Empty) returns (stream CacheInvalidateRequest) {}
     rpc Save(Empty) returns (Empty) {}
 }
 
@@ -55,6 +56,10 @@ message OrderLookupResponse{
     string stockname = 3;
     TradeType trade_type = 4;
     int64 quantity = 5;
+}
+
+message CacheInvalidateRequest{
+    string stockname = 1;
 }
 
 enum TradeType{
