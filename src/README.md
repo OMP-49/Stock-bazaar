@@ -60,6 +60,7 @@ To regenerate Proto files, go to '/src/shared/proto/' and run:
 python -m grpc_tools.protoc -I./ --python_out=. --pyi_out=. --grpc_python_out=. stocktrade.proto
 ```
 update the following import in stocktrade_pb2_grpc.py file
+
 Replace
 ```
 import stocktrade_pb2 as stocktrade__pb2
