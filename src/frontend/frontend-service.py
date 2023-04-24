@@ -4,6 +4,8 @@ from urllib.parse import urlparse
 from urllib.parse import parse_qs
 import socketserver
 import grpc
+import threading
+from threading import Lock 
 import sys
 sys.path.append('../..')
 
@@ -11,8 +13,10 @@ from src.shared.util import logging
 from src import config
 from src.shared.proto import stocktrade_pb2
 from src.shared.proto import stocktrade_pb2_grpc
+from src.shared.model import stock
 
-
+cache = {}
+lock = Lock()
 
 class ThreadedHTTPServer(socketserver.ThreadingMixIn, HTTPServer):
     daemon_threads = True
@@ -108,22 +112,36 @@ def lookup(stockname):
     '''
     logger.info(f"Sending lookup request for : {stockname}")
     try:
-        #call catalog service
-        hostAddr = config.catalog_hostname + ':' + str(config.catalog_port)
-        with grpc.insecure_channel(hostAddr) as channel:
-            stub = stocktrade_pb2_grpc.CatalogServiceStub(channel)
-            lookup_response = stub.Lookup(stocktrade_pb2.LookupRequest(stockname= stockname))
-            logger.info(
-                f"Lookup request: {lookup_response.stockname}, response: Price of stock: {lookup_response.price}, Volume of the stock: {lookup_response.volume}")
-            if lookup_response.price != -1:
+        #check in cache
+        global cache
+        if stockname in cache:
+            logger.info(f"Performing lookup on stock: {stockname} in cache")
+            with lock:
+                lookup_stock= cache[stockname]
                 response =  {
-                    'name' : lookup_response.stockname,
-                    'price' : lookup_response.price,
-                    'quantity' : lookup_response.volume
+                    'name' : lookup_stock.name,
+                    'price' : lookup_stock.getPrice(),
+                    'quantity' : lookup_stock.volume
                 }
-                return get_http_response(response) #prepare http response
-            else:
-                return get_http_error_response(404, 'stock not found') #prepare http error response
+                return get_http_response(response)
+        else:
+            #call catalog service
+            hostAddr = config.catalog_hostname + ':' + str(config.catalog_port)
+            with grpc.insecure_channel(hostAddr) as channel:
+                stub = stocktrade_pb2_grpc.CatalogServiceStub(channel)
+                lookup_response = stub.Lookup(stocktrade_pb2.LookupRequest(stockname= stockname))
+                logger.info(
+                    f"Lookup request: {lookup_response.stockname}, response: Price of stock: {lookup_response.price}, Volume of the stock: {lookup_response.volume}")
+                if lookup_response.price != -1:
+                    response =  {
+                        'name' : lookup_response.stockname,
+                        'price' : lookup_response.price,
+                        'quantity' : lookup_response.volume
+                    }
+                    cache[stockname] = stock.Stock(name= lookup_response.stockname, price= lookup_response.price, vol=lookup_response.volume)
+                    return get_http_response(response) #prepare http response
+                else:
+                    return get_http_error_response(404, 'stock not found') #prepare http error response
     except Exception as e:
         logger.error(f"Failed to get lookup response for {stockname} with expception: {e}") 
     return get_http_error_response(404, 'Internal Server Error')
@@ -138,7 +156,7 @@ def trade(stockname, quantity, trade_type):
     logger.info(f"Sending trade request of type: {trade_type} for : {stockname} with quantity: {quantity}")
     try:
         #call order service
-        hostAddr = config.order_hostname + ':' + str(config.order_port)  
+        hostAddr = config.order_hostname + ':' + str(config.order_port)
         with grpc.insecure_channel(hostAddr) as channel:
             stub = stocktrade_pb2_grpc.OrderServiceStub(channel)
             order_response = stub.Trade(stocktrade_pb2.TradeRequest(
@@ -187,7 +205,22 @@ def order_lookup(order_id):
         logger.error(f"Failed to query order {order_id} with expception: {e}") 
     return get_http_error_response(404, 'Internal Server Error')
 
-
+def subscribe_to_db_updates():
+    logger.info(f"Subscribing to db updates messages")
+    try:
+        hostAddr = config.order_hostname + ':' + str(config.order_port)
+        with grpc.insecure_channel(hostAddr) as channel:
+            stub = stocktrade_pb2_grpc.OrderServiceStub(channel)
+            global cache
+            for response in stub.StreamDBUpdates(stocktrade_pb2.Empty()):
+                stockname = response.stockname
+                logger.info(f"Invalidating stock : {stockname} in cache")
+                if stockname in cache:
+                    with lock: 
+                        del cache[stockname]
+    except Exception as e:
+        logger.error(f"Failed to subscribe to order updates")
+        print(e)
 
 #TODO: remove the function (not using)
 def save_file():
@@ -242,6 +275,8 @@ if __name__ == "__main__":
     port = config.frontend_port
     webServer = ThreadedHTTPServer((hostname, port), Handler)
     logger.info("Server started http://%s:%s" % (hostname, port))
+    db_thread = threading.Thread(target=subscribe_to_db_updates, args=())
+    db_thread.start()
 
     try:
         webServer.serve_forever()
@@ -250,4 +285,5 @@ if __name__ == "__main__":
     
     # atexit.register(save_file)
     webServer.server_close()
+    db_thread.join()
     logger.warning("Server stopped.")
