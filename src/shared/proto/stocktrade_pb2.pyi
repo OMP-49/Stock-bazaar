@@ -7,6 +7,12 @@ BUY: TradeType
 DESCRIPTOR: _descriptor.FileDescriptor
 SELL: TradeType
 
+class CacheInvalidateRequest(_message.Message):
+    __slots__ = ["stockname"]
+    STOCKNAME_FIELD_NUMBER: _ClassVar[int]
+    stockname: str
+    def __init__(self, stockname: _Optional[str] = ...) -> None: ...
+
 class Empty(_message.Message):
     __slots__ = []
     def __init__(self) -> None: ...
@@ -26,6 +32,26 @@ class LookupResponse(_message.Message):
     stockname: str
     volume: int
     def __init__(self, stockname: _Optional[str] = ..., price: _Optional[float] = ..., volume: _Optional[int] = ...) -> None: ...
+
+class OrderLookupRequest(_message.Message):
+    __slots__ = ["order_id"]
+    ORDER_ID_FIELD_NUMBER: _ClassVar[int]
+    order_id: int
+    def __init__(self, order_id: _Optional[int] = ...) -> None: ...
+
+class OrderLookupResponse(_message.Message):
+    __slots__ = ["order_id", "quantity", "status", "stockname", "trade_type"]
+    ORDER_ID_FIELD_NUMBER: _ClassVar[int]
+    QUANTITY_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    STOCKNAME_FIELD_NUMBER: _ClassVar[int]
+    TRADE_TYPE_FIELD_NUMBER: _ClassVar[int]
+    order_id: int
+    quantity: int
+    status: int
+    stockname: str
+    trade_type: TradeType
+    def __init__(self, order_id: _Optional[int] = ..., status: _Optional[int] = ..., stockname: _Optional[str] = ..., trade_type: _Optional[_Union[TradeType, str]] = ..., quantity: _Optional[int] = ...) -> None: ...
 
 class TradeRequest(_message.Message):
     __slots__ = ["quantity", "stockname", "trade_type"]

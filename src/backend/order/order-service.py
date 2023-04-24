@@ -4,6 +4,7 @@ import grpc
 import threading
 import time
 from threading import Lock
+from queue import Queue
 import atexit
 import sys
 sys.path.append('../../..')
@@ -11,10 +12,12 @@ from src import config
 from src.shared.proto import stocktrade_pb2
 from src.shared.proto import stocktrade_pb2_grpc
 from src.shared.util import logging
+from src.shared.model import order
 
-stockorders_db = []     # stock orders db to store all the stock trade requests
+stockorders_db = {}     # stock orders db to store all the stock trade requests
 curr_tran = 0           # current transaction number to keep track of transactions
 lock = Lock()           # lock to access the above global variables
+updated_stocks_queue = Queue()             # queue to stream db updates
 
 # Implementing Trade method defined in proto file
 class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
@@ -38,7 +41,8 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
                 stub = stocktrade_pb2_grpc.CatalogServiceStub(channel)
                 response = stub.Update(stocktrade_pb2.UpdateRequest(stockname=name, trade_type=type, quantity=quantity ))
                 logger.info(f"Trade request: {name},{typew},{quantity}, response: status: {response.status}")
-                
+                global updated_stocks_queue
+                updated_stocks_queue.put(name)
                 # if trade is processed correctly, increase the transaction number and save it to in-memory stockorders_db
                 if response.status == 1:
                     with lock:
@@ -46,7 +50,7 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
                         global curr_tran
                         global stockorders_db
                         curr_tran = curr_tran + 1
-                        stockorders_db.append((curr_tran,name,typew,quantity))
+                        stockorders_db[curr_tran] = order.Order(order_id=curr_tran, stockname=name, trade_type=typew, quantity=quantity)
                         write_order_to_file()
                         return stocktrade_pb2.TradeResponse(stockname=name,status=response.status, transaction_number=curr_tran)
                 # if trade is not processed, return status with transaction number -1 to indicate failure.
@@ -54,6 +58,38 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
         except Exception as e:
             logger.error(f"Failed to process Trade request in order-service for request : {request}. Failed with exception: {e}")
         return stocktrade_pb2.TradeResponse(stockname=name,status=-1, transaction_number=-1)
+
+    def OrderLookup(self, request, context):
+        ''' 
+        Funtion to query am existing order. Returns the order id, stockname, type, and quantity of the order
+        :param  request:  contains the id of the order to perform lookup on
+        :return response: contains the order id, name, type and quantity traded in the order.
+        status field is also added in the response. If the order is found, status is set to 1, otherwise -1.
+        '''
+        try:
+            order_id = int(request.order_id)  # id of the order to perform lookup on
+            logger.info(f'Received lookup request for order: {order_id} on order service')
+            # if the order is present in database return name, type, and quantity from db
+            global stockorders_db
+            if order_id in stockorders_db:
+                with lock:
+                    # TODO: read lock
+                    order_info = stockorders_db[order_id]
+                    print(order_info)
+                    return stocktrade_pb2.OrderLookupResponse(order_id=1, status= 1, stockname=order_info.stockname,
+                             trade_type=order_info.trade_type, quantity=order_info.quantity)
+            # if order is not present in database return status as -1
+            return stocktrade_pb2.OrderLookupResponse(order_id=order_id, status = -1)
+        except Exception as e:
+            logger.error(f"Failed to process lookup request for request : {request} with exception: {e}")
+            return stocktrade_pb2.LookupResponse(order_id=order_id, status = -1)
+    
+    def StreamDBUpdates(self, request, context):
+        global updated_stocks_queue
+        while True:
+            if (not updated_stocks_queue.empty()):
+                yield stocktrade_pb2.CacheInvalidateRequest(stockname= updated_stocks_queue.get())          
+
     
     def Save(self, request, context):
         dump_to_disk()
@@ -84,7 +120,7 @@ def load_stockorders_db():
     # add the stock objects to db
     global stockorders_db
     global curr_tran
-    stockorders_db = []
+    stockorders_db = {}
     curr_tran = 0
     try:
         with open('data/stockOrderDB.txt') as file:
@@ -93,7 +129,7 @@ def load_stockorders_db():
             for line in file:
                 trans_num,stockname,type,quantity =line.rstrip().split(',')
                 trans_num,stockname,type,quantity = int(trans_num.strip()), stockname.strip(), type.strip(), int(quantity.strip())
-                stockorders_db.append((trans_num,stockname,type,quantity))
+                stockorders_db[trans_num] = order.Order(order_id=trans_num, stockname=stockname, trade_type=type, quantity=quantity)
                 curr_tran = max(curr_tran,trans_num)
         logger.info("Done!")
     except Exception as e:
@@ -111,17 +147,16 @@ def write_order_to_file():
     try:
         # Adding header to the database
         if curr_tran == 1:
-            dbwithheader = [('transaction_number','stockname','ordertype','quantity')] + stockorders_db
-            lines = [','.join(map(str,order)) for order in dbwithheader]
+            dbwithheader = ['transaction_number,stockname,ordertype,quantity', stockorders_db[curr_tran].to_string()]
             with open('data/stockOrderDB.txt','w') as file:
-                file.write('\n'.join(lines))
+                file.write('\n'.join(dbwithheader))
         else:
-            line = '\n' + ','.join(map(str,stockorders_db[-1]))
+            line = '\n' + stockorders_db[curr_tran].to_string()
             with open('data/stockOrderDB.txt','a') as file:
                 file.write(line)
         print("Done!")
     except Exception as e:
-        print(f"Cannot write to the file.Failed with Exception: {e}")
+        print(f"Cannot write to the file. Failed with Exception: {e}")
     
 
 
@@ -134,8 +169,8 @@ def dump_to_disk():
     global stockorders_db
     try:
         # Adding header to the database
-        dbwithheader = [('transaction_number','stockname','ordertype','quantity')]+ stockorders_db
-        lines = [','.join(map(str,order)) for order in dbwithheader]
+        header = ['transaction_number,stockname,ordertype,quantity'] 
+        lines = header + [value.to_string() for value in stockorders_db.values()]
         with open('data/stockOrderDB.txt','w') as file:
             file.write('\n'.join(lines))
         logger.info("Done!")
