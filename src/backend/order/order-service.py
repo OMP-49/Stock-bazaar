@@ -3,6 +3,7 @@ from concurrent import futures
 import grpc
 import threading
 import time
+import argparse
 from threading import Lock
 from queue import Queue
 import atexit
@@ -120,10 +121,11 @@ def load_stockorders_db():
     # add the stock objects to db
     global stockorders_db
     global curr_tran
+    global service_id
     stockorders_db = {}
     curr_tran = 0
     try:
-        with open('data/stockOrderDB.txt') as file:
+        with open(f'data/stockOrderDB_{service_id}.txt') as file:
             # to skip the first line - first line is header
             file.readline()
             for line in file:
@@ -132,6 +134,8 @@ def load_stockorders_db():
                 stockorders_db[trans_num] = order.Order(order_id=trans_num, stockname=stockname, trade_type=type, quantity=quantity)
                 curr_tran = max(curr_tran,trans_num)
         logger.info("Done!")
+    except FileNotFoundError as e:
+        logger.error(f"DB file is not present, starting server for the first time. File will be created if a trade happens\nException: {e}")
     except Exception as e:
         logger.error(f"cannot read the text, please make sure the formatting in the file is correct\nException: {e}")
     
@@ -144,15 +148,16 @@ def write_order_to_file():
     print("Saving order to disk", end='...')
     global stockorders_db
     global curr_tran
+    global service_id
     try:
         # Adding header to the database
         if curr_tran == 1:
             dbwithheader = ['transaction_number,stockname,ordertype,quantity', stockorders_db[curr_tran].to_string()]
-            with open('data/stockOrderDB.txt','w') as file:
+            with open(f'data/stockOrderDB_{service_id}.txt','w') as file:
                 file.write('\n'.join(dbwithheader))
         else:
             line = '\n' + stockorders_db[curr_tran].to_string()
-            with open('data/stockOrderDB.txt','a') as file:
+            with open(f'data/stockOrderDB_{service_id}.txt','a') as file:
                 file.write(line)
         print("Done!")
     except Exception as e:
@@ -167,25 +172,44 @@ def dump_to_disk():
     
     logger.info("Saving data to disk...")
     global stockorders_db
+    global service_id
     try:
         # Adding header to the database
         header = ['transaction_number,stockname,ordertype,quantity'] 
         lines = header + [value.to_string() for value in stockorders_db.values()]
-        with open('data/stockOrderDB.txt','w') as file:
+        with open(f'data/stockOrderDB_{service_id}.txt','w') as file:
             file.write('\n'.join(lines))
         logger.info("Done!")
     except Exception as e:
         logger.error(f"Cannot write to the file.Failed with Exception: {e}")
-    
+
+
+def getHostAddr():
+    # returns the host address for the order service based on its service_id
+    global service_id
+    if service_id >= config.minID and service_id <= config.maxID:
+        return config.order_hostname + ':' + str(config.order_ports[service_id-1])
+    else:
+        print("Invalid order service id number")
+        return ""
 
 if __name__ == '__main__':
     try:
         logger = logging.logger('order-service')
-        # initialize database
-        load_stockorders_db()
-        # start the server on hostAddr to receive requests
-        hostAddr = config.order_hostname + ':' + str(config.order_port)
-        serve(hostAddr)
+        # command line arguments for reading ID number of a order server instance
+        parser = argparse.ArgumentParser(description='OrderService')
+        parser.add_argument('-id', type=int, default=-1, help='input order service id for this instance')
+        args = parser.parse_args()
+        if args.id >= config.minID  and args.id <= config.maxID:
+            global service_id
+            service_id = args.id    
+            # initialize database
+            load_stockorders_db()
+            # start the server on hostAddr to receive requests
+            hostAddr = getHostAddr()
+            serve(hostAddr)
+        else:
+            print("Order service id is either missing or not in bounds, please start service with a valid ID")
     except KeyboardInterrupt:
         logger.warning("Keyboard interrupt")
     except Exception as e:
