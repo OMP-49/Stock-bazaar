@@ -145,6 +145,11 @@ class OrderServiceStub(object):
                 request_serializer=stocktrade__pb2.SyncRequest.SerializeToString,
                 response_deserializer=stocktrade__pb2.OrderDBItem.FromString,
                 )
+        self.SetLeader = channel.unary_unary(
+                '/OrderService/SetLeader',
+                request_serializer=stocktrade__pb2.SetLeaderRequest.SerializeToString,
+                response_deserializer=stocktrade__pb2.Empty.FromString,
+                )
 
 
 class OrderServiceServicer(object):
@@ -192,6 +197,12 @@ class OrderServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def SetLeader(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_OrderServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -229,6 +240,11 @@ def add_OrderServiceServicer_to_server(servicer, server):
                     servicer.SyncOrderDB,
                     request_deserializer=stocktrade__pb2.SyncRequest.FromString,
                     response_serializer=stocktrade__pb2.OrderDBItem.SerializeToString,
+            ),
+            'SetLeader': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetLeader,
+                    request_deserializer=stocktrade__pb2.SetLeaderRequest.FromString,
+                    response_serializer=stocktrade__pb2.Empty.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -356,5 +372,22 @@ class OrderService(object):
         return grpc.experimental.unary_stream(request, target, '/OrderService/SyncOrderDB',
             stocktrade__pb2.SyncRequest.SerializeToString,
             stocktrade__pb2.OrderDBItem.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def SetLeader(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/OrderService/SetLeader',
+            stocktrade__pb2.SetLeaderRequest.SerializeToString,
+            stocktrade__pb2.Empty.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

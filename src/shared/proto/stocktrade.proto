@@ -13,6 +13,7 @@ service OrderService{
     rpc IsAlive(Empty) returns (AliveResponse) {}
     rpc SyncOrderRequest(OrderDBItem) returns (Empty) {}
     rpc SyncOrderDB(SyncRequest) returns (stream OrderDBItem) {}
+    rpc SetLeader(SetLeaderRequest) returns (Empty) {}
 }
 
 message LookupRequest{
@@ -87,4 +88,8 @@ message OrderDBItem{
 
 message SyncRequest{
     int64 max_transaction_number = 1;
+}
+
+message SetLeaderRequest{
+    int64 leader_id = 1;
 }

@@ -71,6 +71,12 @@ class OrderLookupResponse(_message.Message):
     trade_type: TradeType
     def __init__(self, order_id: _Optional[int] = ..., status: _Optional[int] = ..., stockname: _Optional[str] = ..., trade_type: _Optional[_Union[TradeType, str]] = ..., quantity: _Optional[int] = ...) -> None: ...
 
+class SetLeaderRequest(_message.Message):
+    __slots__ = ["leader_id"]
+    LEADER_ID_FIELD_NUMBER: _ClassVar[int]
+    leader_id: int
+    def __init__(self, leader_id: _Optional[int] = ...) -> None: ...
+
 class SyncRequest(_message.Message):
     __slots__ = ["max_transaction_number"]
     MAX_TRANSACTION_NUMBER_FIELD_NUMBER: _ClassVar[int]
