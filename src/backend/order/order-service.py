@@ -34,7 +34,7 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
             type = request.trade_type
             quantity = request.quantity
             typew = 'SELL' if type == 1 else 'BUY'
-            logger.info(f'Received Trade request for: {name},{typew},{quantity} on order-service')
+            logger.info(f'Received Trade request for: {name},{typew},{quantity} on order-service_{service_id}')
     
             hostAddr = config.catalog_hostname + ':' + str(config.catalog_port)
             # sending the trade request to catalog for checking and updating the stockDB at catalog
@@ -53,11 +53,12 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
                         curr_tran = curr_tran + 1
                         stockorders_db[curr_tran] = order.Order(order_id=curr_tran, stockname=name, trade_type=typew, quantity=quantity)
                         write_order_to_file()
+                        replicate_order(curr_tran, name, typew, quantity)
                         return stocktrade_pb2.TradeResponse(stockname=name,status=response.status, transaction_number=curr_tran)
                 # if trade is not processed, return status with transaction number -1 to indicate failure.
                 return stocktrade_pb2.TradeResponse(stockname=name,status=response.status, transaction_number=-1)
         except Exception as e:
-            logger.error(f"Failed to process Trade request in order-service for request : {request}. Failed with exception: {e}")
+            logger.error(f"Failed to process Trade request in order-service_{service_id} for request : {request}. Failed with exception: {e}")
         return stocktrade_pb2.TradeResponse(stockname=name,status=-1, transaction_number=-1)
 
     def OrderLookup(self, request, context):
@@ -69,7 +70,7 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
         '''
         try:
             order_id = int(request.order_id)  # id of the order to perform lookup on
-            logger.info(f'Received lookup request for order: {order_id} on order service')
+            logger.info(f'Received lookup request for order: {order_id} on order service {service_id}')
             # if the order is present in database return name, type, and quantity from db
             global stockorders_db
             if order_id in stockorders_db:
@@ -95,6 +96,47 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
     def Save(self, request, context):
         dump_to_disk()
         return stocktrade_pb2.Empty()
+
+    def IsAlive(self, request, context):
+        return stocktrade_pb2.AliveResponse(is_alive=True)
+
+    def SyncOrderRequest(self, request, context):
+        ''' 
+        Funtion to sync the latest processed trade request at leader service - stores the order to the local service db
+        :param  request:  contains the transaction_number, stockname, trade type and quantity
+        '''
+        logger.info(f"Sync Order Request: {request.stockname},{request.trade_type},{request.quantity}, transaction_number: {request.transaction_number} at order-service_{service_id}")
+        with lock:
+            # TODO : write lock
+            global curr_tran
+            global stockorders_db
+            curr_tran = request.transaction_number
+            stockorders_db[curr_tran] = order.Order(order_id=curr_tran, stockname=request.stockname, trade_type=request.trade_type, quantity=request.quantity)
+            write_order_to_file()
+        return stocktrade_pb2.Empty()
+
+    def SyncOrderDB(self, request, context):
+        pass
+
+
+def replicate_order(transaction_number, stockname, trade_type, quantity):
+    '''
+    Function to send the latest successful trade order to the replica order services to maintain data sync
+    '''
+    global service_id
+    for i in range(len(config.order_ports)):
+        if i == service_id-1:
+            continue
+        hostAddr = config.order_hostname + ':' + str(config.order_ports[i])
+        logger.info(f"Sending SyncOrderRequest to the order service replica at {hostAddr}, orderId = {transaction_number}")
+        try:
+            with grpc.insecure_channel(hostAddr) as channel:
+                stub = stocktrade_pb2_grpc.OrderServiceStub(channel)
+                sync_response = stub.SyncOrderRequest(stocktrade_pb2.OrderDBItem(stockname=stockname, quantity=quantity, trade_type=trade_type, transaction_number=transaction_number))
+        except Exception as e:
+            logger.error(f"Failed to sync transaction with service replica at {hostAddr}, orderId= {transaction_number}\nWith exception: {e}")
+    return
+
 
 
 def serve(hostAddr):
