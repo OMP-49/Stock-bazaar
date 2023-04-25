@@ -130,6 +130,21 @@ class OrderServiceStub(object):
                 request_serializer=stocktrade__pb2.Empty.SerializeToString,
                 response_deserializer=stocktrade__pb2.Empty.FromString,
                 )
+        self.IsAlive = channel.unary_unary(
+                '/OrderService/IsAlive',
+                request_serializer=stocktrade__pb2.Empty.SerializeToString,
+                response_deserializer=stocktrade__pb2.AliveResponse.FromString,
+                )
+        self.SyncOrderRequest = channel.unary_unary(
+                '/OrderService/SyncOrderRequest',
+                request_serializer=stocktrade__pb2.OrderDBItem.SerializeToString,
+                response_deserializer=stocktrade__pb2.Empty.FromString,
+                )
+        self.SyncOrderDB = channel.unary_stream(
+                '/OrderService/SyncOrderDB',
+                request_serializer=stocktrade__pb2.SyncRequest.SerializeToString,
+                response_deserializer=stocktrade__pb2.OrderDBItem.FromString,
+                )
 
 
 class OrderServiceServicer(object):
@@ -159,6 +174,24 @@ class OrderServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def IsAlive(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SyncOrderRequest(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SyncOrderDB(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_OrderServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -181,6 +214,21 @@ def add_OrderServiceServicer_to_server(servicer, server):
                     servicer.Save,
                     request_deserializer=stocktrade__pb2.Empty.FromString,
                     response_serializer=stocktrade__pb2.Empty.SerializeToString,
+            ),
+            'IsAlive': grpc.unary_unary_rpc_method_handler(
+                    servicer.IsAlive,
+                    request_deserializer=stocktrade__pb2.Empty.FromString,
+                    response_serializer=stocktrade__pb2.AliveResponse.SerializeToString,
+            ),
+            'SyncOrderRequest': grpc.unary_unary_rpc_method_handler(
+                    servicer.SyncOrderRequest,
+                    request_deserializer=stocktrade__pb2.OrderDBItem.FromString,
+                    response_serializer=stocktrade__pb2.Empty.SerializeToString,
+            ),
+            'SyncOrderDB': grpc.unary_stream_rpc_method_handler(
+                    servicer.SyncOrderDB,
+                    request_deserializer=stocktrade__pb2.SyncRequest.FromString,
+                    response_serializer=stocktrade__pb2.OrderDBItem.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -257,5 +305,56 @@ class OrderService(object):
         return grpc.experimental.unary_unary(request, target, '/OrderService/Save',
             stocktrade__pb2.Empty.SerializeToString,
             stocktrade__pb2.Empty.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def IsAlive(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/OrderService/IsAlive',
+            stocktrade__pb2.Empty.SerializeToString,
+            stocktrade__pb2.AliveResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def SyncOrderRequest(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/OrderService/SyncOrderRequest',
+            stocktrade__pb2.OrderDBItem.SerializeToString,
+            stocktrade__pb2.Empty.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def SyncOrderDB(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(request, target, '/OrderService/SyncOrderDB',
+            stocktrade__pb2.SyncRequest.SerializeToString,
+            stocktrade__pb2.OrderDBItem.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

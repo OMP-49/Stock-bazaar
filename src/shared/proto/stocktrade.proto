@@ -10,6 +10,9 @@ service OrderService{
     rpc OrderLookup(OrderLookupRequest) returns (OrderLookupResponse) {}
     rpc StreamDBUpdates(Empty) returns (stream CacheInvalidateRequest) {}
     rpc Save(Empty) returns (Empty) {}
+    rpc IsAlive(Empty) returns (AliveResponse) {}
+    rpc SyncOrderRequest(OrderDBItem) returns (Empty) {}
+    rpc SyncOrderDB(SyncRequest) returns (stream OrderDBItem) {}
 }
 
 message LookupRequest{
@@ -69,4 +72,19 @@ enum TradeType{
 
 message Empty{
 
+}
+
+message AliveResponse{
+    bool is_alive = 1;
+}
+
+message OrderDBItem{
+    string stockname = 1;
+    TradeType trade_type = 2;
+    int64 quantity = 3;
+    int64 transaction_number = 4;
+}
+
+message SyncRequest{
+    int64 max_transaction_number = 1;
 }
