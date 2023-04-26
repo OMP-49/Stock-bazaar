@@ -174,9 +174,18 @@ def trade(stockname, quantity, trade_type):
                 return get_http_error_response(404, 'Trading not permitted due to insufficient volume') #prepare order response
             else:
                 return get_http_error_response(404, 'Stock not found')
+    except grpc.RpcError as rpc_error:
+        if rpc_error.code() == grpc.StatusCode.UNAVAILABLE:
+            logger.info(f"Failed to process the trade request\nOrder service instance at {hostAddr} is not alive/unavailable\nException: {rpc_error}")
+            global leader_id
+            leader_id = 0
+            logger.info(f"Resending trade request...")
+            return trade(stockname, quantity, trade_type)
+        else:
+            logger.error(f"Failed to get trade response for {stockname} with exception: {rpc_error}")
     except Exception as e:
         logger.error(f"Failed to get trade response for {stockname} with exception: {e}")
-        return get_http_error_response(404, 'Internal Server Error')
+    return get_http_error_response(404, 'Internal Server Error')
     
 def order_lookup(order_id):
     '''
@@ -204,6 +213,15 @@ def order_lookup(order_id):
                 return get_http_response(response) #prepare http response
             else:
                 return get_http_error_response(404, 'order not found') #prepare http error response
+    except grpc.RpcError as rpc_error:
+        if rpc_error.code() == grpc.StatusCode.UNAVAILABLE:
+            logger.info(f"Failed to process the order lookup request\nOrder service instance at {hostAddr} is not alive/unavailable\nException: {rpc_error}")
+            global leader_id
+            leader_id = 0
+            logger.info(f"Resending order lookup request...")
+            return order_lookup(order_id)
+        else:
+            logger.error(f"Failed to query order {order_id} with expception: {rpc_error}") 
     except Exception as e:
         logger.error(f"Failed to query order {order_id} with expception: {e}") 
     return get_http_error_response(404, 'Internal Server Error')
@@ -222,8 +240,18 @@ def subscribe_to_db_updates():
                 if stockname in cache:
                     with lock: 
                         del cache[stockname]
+    except grpc.RpcError as rpc_error:
+        if rpc_error.code() == grpc.StatusCode.UNAVAILABLE:
+            logger.info(f"Exception occured during subscribing to db updates\nOrder service instance at {hostAddr} is not alive/unavailable\nException: {rpc_error}")
+            global leader_id
+            leader_id = 0
+            logger.info(f"Resubscribing to db updates")
+            subscribe_to_db_updates()
+        else:
+            logger.error(f"Failed to subscribe to order updates with exception: {rpc_error}")
+            print(rpc_error)
     except Exception as e:
-        logger.error(f"Failed to subscribe to order updates")
+        logger.error(f"Failed to subscribe to order updates with exception: {e}")
         print(e)
 
 #TODO: remove the function (not using)
@@ -231,12 +259,14 @@ def save_file():
     '''
     Function to call save files before exiting.
     '''
-    # hostAddr = config.order_hostname + ':' + str(config.order_port)
-    hostAddr = getHostAddr()
-    with grpc.insecure_channel(hostAddr) as channel:
-        stub = stocktrade_pb2_grpc.OrderServiceStub(channel)
-        stub.Save(stocktrade_pb2.Empty())
-        
+    try:
+        # hostAddr = config.order_hostname + ':' + str(config.order_port)
+        hostAddr = getHostAddr()
+        with grpc.insecure_channel(hostAddr) as channel:
+            stub = stocktrade_pb2_grpc.OrderServiceStub(channel)
+            stub.Save(stocktrade_pb2.Empty())
+    except Exception as e:
+        logger.error(f"Failed to call Save on order service with exception: {e}")    
 
 def get_http_response(response):
     '''
@@ -286,7 +316,7 @@ def leader_election():
     Function to elect leader among all the order service instances
     sends isAlive request to all the instances in reverse order of their IDs, whenever a response is received stops the election and broadcasts the leader.
     '''
-    print("Leader election")
+    logger.error("Leader election")
     global leader_id
     leader_id = 0
     for i in range(len(config.order_ports)-1, -1,-1):
@@ -299,14 +329,19 @@ def leader_election():
                 if alive_response.is_alive:
                     leader_id = i+1
                     break
+        except grpc.RpcError as rpc_error:
+            if rpc_error.code() == grpc.StatusCode.UNAVAILABLE:
+                logger.error(f"Order service instance at {hostAddr} is not alive/unavailable\nException: {rpc_error}")
+            else:
+                logger.error(f" Failed to connect the Order service instance at {hostAddr}\nException: {rpc_error}")
         except Exception as e:
-            logger.error(f"Order service instance at {hostAddr} is not alive or an exception occured conneting to the service\nException: {e}")
+            logger.error(f" Failed to connect the Order service instance at {hostAddr}\nException: {e}")
     
     if leader_id != 0:
-        print(f"Leader found in leader election: order service instance: {leader_id}")
+        logger.error(f"Leader found in leader election: order service instance: {leader_id}")
         broadcast_leader(leader_id)
     else:
-        print("Leader cannot be found - Please be sure that atleast one order service instance is up and running")
+        logger.error("Leader cannot be found - Please be sure that atleast one order service instance is up and running")
     return
 
 
@@ -315,7 +350,7 @@ def broadcast_leader(id):
     Function to broadcast the elected leader to all the order service instances
     :param id: id of the leader order service
     '''
-    print("Broadcast leader")
+    logger.error("Broadcast leader")
     for i in range(len(config.order_ports)):
         try:
             hostAddr = config.order_hostname + ':' + str(config.order_ports[i])
@@ -323,6 +358,11 @@ def broadcast_leader(id):
             with grpc.insecure_channel(hostAddr) as channel:
                 stub = stocktrade_pb2_grpc.OrderServiceStub(channel)
                 set_leader_response = stub.SetLeader(stocktrade_pb2.SetLeaderRequest(leader_id=id))
+        except grpc.RpcError as rpc_error:
+            if rpc_error.code() == grpc.StatusCode.UNAVAILABLE:
+                logger.error(f"Order service instance at {hostAddr} is not alive/unavailable so could not send SetLeader request\nException: {rpc_error}")
+            else:
+                logger.error(f"Failed to send SetLeader to the service instance at {hostAddr}, leader_id= {id}\nWith exception: {rpc_error}")
         except Exception as e:
             logger.error(f"Failed to send SetLeader to the service instance at {hostAddr}, leader_id= {id}\nWith exception: {e}")
     return
