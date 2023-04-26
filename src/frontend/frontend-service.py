@@ -157,7 +157,8 @@ def trade(stockname, quantity, trade_type):
     logger.info(f"Sending trade request of type: {trade_type} for : {stockname} with quantity: {quantity}")
     try:
         #call order service
-        hostAddr = config.order_hostname + ':' + str(config.order_port)
+        # hostAddr = config.order_hostname + ':' + str(config.order_port)
+        hostAddr = getHostAddr()
         with grpc.insecure_channel(hostAddr) as channel:
             stub = stocktrade_pb2_grpc.OrderServiceStub(channel)
             order_response = stub.Trade(stocktrade_pb2.TradeRequest(
@@ -186,7 +187,8 @@ def order_lookup(order_id):
     try:
         #query the order service
         order_id = int(order_id)
-        hostAddr = config.order_hostname + ':' + str(config.order_port)
+        # hostAddr = config.order_hostname + ':' + str(config.order_port)
+        hostAddr = getHostAddr()
         with grpc.insecure_channel(hostAddr) as channel:
             stub = stocktrade_pb2_grpc.OrderServiceStub(channel)
             order_lookup_response = stub.OrderLookup(stocktrade_pb2.OrderLookupRequest(order_id= order_id))
@@ -209,7 +211,8 @@ def order_lookup(order_id):
 def subscribe_to_db_updates():
     logger.info(f"Subscribing to db updates messages")
     try:
-        hostAddr = config.order_hostname + ':' + str(config.order_port)
+        # hostAddr = config.order_hostname + ':' + str(config.order_port)
+        hostAddr = getHostAddr()
         with grpc.insecure_channel(hostAddr) as channel:
             stub = stocktrade_pb2_grpc.OrderServiceStub(channel)
             global cache
@@ -228,7 +231,8 @@ def save_file():
     '''
     Function to call save files before exiting.
     '''
-    hostAddr = config.order_hostname + ':' + str(config.order_port)  
+    # hostAddr = config.order_hostname + ':' + str(config.order_port)
+    hostAddr = getHostAddr()
     with grpc.insecure_channel(hostAddr) as channel:
         stub = stocktrade_pb2_grpc.OrderServiceStub(channel)
         stub.Save(stocktrade_pb2.Empty())
@@ -267,6 +271,15 @@ def convert_to_json(obj):
         return json_obj
     except Exception as e:
         return None
+
+
+def getHostAddr():
+    global leader_id
+    if(leader_id == 0):
+        leader_election()
+    hostAddr = config.order_hostname + ':' + str(config.order_ports[leader_id-1])
+    return hostAddr
+
 
 def leader_election():
     '''
