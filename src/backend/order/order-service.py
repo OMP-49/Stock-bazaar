@@ -19,6 +19,7 @@ stockorders_db = {}     # stock orders db to store all the stock trade requests
 curr_tran = 0           # current transaction number to keep track of transactions
 lock = Lock()           # lock to access the above global variables
 updated_stocks_queue = Queue()             # queue to stream db updates
+leader_id = 0
 
 # Implementing Trade method defined in proto file
 class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
@@ -53,6 +54,7 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
                         curr_tran = curr_tran + 1
                         stockorders_db[curr_tran] = order.Order(order_id=curr_tran, stockname=name, trade_type=typew, quantity=quantity)
                         write_order_to_file()
+                        # TODO: can run replicate_order on seperate thread instead of sequentially
                         replicate_order(curr_tran, name, typew, quantity)
                         return stocktrade_pb2.TradeResponse(stockname=name,status=response.status, transaction_number=curr_tran)
                 # if trade is not processed, return status with transaction number -1 to indicate failure.
@@ -98,7 +100,22 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
         return stocktrade_pb2.Empty()
 
     def IsAlive(self, request, context):
+        ''' 
+        Funtion to check if the service is alive or not from frontend
+        :param  request: does not contain any field
+        :return response: returns alive response with boolean True
+        '''
         return stocktrade_pb2.AliveResponse(is_alive=True)
+
+    def SetLeader(self, request, context):
+        ''' 
+        Funtion to set elected leader from the leader election 
+        :param  request:  contains the id of the elected leader
+        :return response: Empty response
+        '''
+        global leader_id
+        leader_id = request.leader_id
+        return stocktrade_pb2.Empty()
 
     def SyncOrderRequest(self, request, context):
         ''' 

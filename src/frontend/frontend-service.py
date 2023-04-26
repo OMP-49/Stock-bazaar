@@ -17,6 +17,7 @@ from src.shared.model import stock
 
 cache = {}
 lock = Lock()
+leader_id = 0
 
 class ThreadedHTTPServer(socketserver.ThreadingMixIn, HTTPServer):
     daemon_threads = True
@@ -267,6 +268,52 @@ def convert_to_json(obj):
     except Exception as e:
         return None
 
+def leader_election():
+    '''
+    Function to elect leader among all the order service instances
+    sends isAlive request to all the instances in reverse order of their IDs, whenever a response is received stops the election and broadcasts the leader.
+    '''
+    print("Leader election")
+    global leader_id
+    leader_id = 0
+    for i in range(len(config.order_ports)-1, -1,-1):
+        try:
+            hostAddr = config.order_hostname + ':' + str(config.order_ports[i])
+            logger.info(f"Sending IsAlive to the order service instance at {hostAddr}")
+            with grpc.insecure_channel(hostAddr) as channel:
+                stub = stocktrade_pb2_grpc.OrderServiceStub(channel)
+                alive_response = stub.IsAlive(stocktrade_pb2.Empty())
+                if alive_response.is_alive:
+                    leader_id = i+1
+                    break
+        except Exception as e:
+            logger.error(f"Order service instance at {hostAddr} is not alive or an exception occured conneting to the service\nException: {e}")
+    
+    if leader_id != 0:
+        print(f"Leader found in leader election: order service instance: {leader_id}")
+        broadcast_leader(leader_id)
+    else:
+        print("Leader cannot be found - Please be sure that atleast one order service instance is up and running")
+    return
+
+
+def broadcast_leader(id):
+    '''
+    Function to broadcast the elected leader to all the order service instances
+    :param id: id of the leader order service
+    '''
+    print("Broadcast leader")
+    for i in range(len(config.order_ports)):
+        try:
+            hostAddr = config.order_hostname + ':' + str(config.order_ports[i])
+            logger.info(f"Sending SetLeader to the order service instance at {hostAddr}, leader_id={id}")
+            with grpc.insecure_channel(hostAddr) as channel:
+                stub = stocktrade_pb2_grpc.OrderServiceStub(channel)
+                set_leader_response = stub.SetLeader(stocktrade_pb2.SetLeaderRequest(leader_id=id))
+        except Exception as e:
+            logger.error(f"Failed to send SetLeader to the service instance at {hostAddr}, leader_id= {id}\nWith exception: {e}")
+    return
+
 
 if __name__ == "__main__":
     #create a custom logger for frontend service
@@ -275,6 +322,7 @@ if __name__ == "__main__":
     port = config.frontend_port
     webServer = ThreadedHTTPServer((hostname, port), Handler)
     logger.info("Server started http://%s:%s" % (hostname, port))
+    leader_election()
     db_thread = threading.Thread(target=subscribe_to_db_updates, args=())
     db_thread.start()
 
