@@ -133,7 +133,16 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
         return stocktrade_pb2.Empty()
 
     def SyncOrderDB(self, request, context):
-        pass
+        ''' 
+        Funtion to sync DB data with a service that just came from crash/started
+        :param  request:  contains the maximum transaction id at the restarted service
+        :return response: stream of order database item containing order details
+        '''
+        global stockorders_db
+        for k,order_info in stockorders_db.items():
+            if k > request.max_transaction_number:
+                yield stocktrade_pb2.OrderDBItem(
+                    stockname=order_info.stockname, trade_type=order_info.trade_type, quantity=order_info.quantity, transaction_number=order_info.transaction_number)
 
 
 def replicate_order(transaction_number, stockname, trade_type, quantity):
@@ -243,6 +252,45 @@ def dump_to_disk():
         logger.error(f"Cannot write to the file.Failed with Exception: {e}")
 
 
+def syncDataBase():
+    '''
+    Function to find one of the available order services and get data from them after coming from a crash
+    '''
+    
+    logger.info("Syncing database...")
+    global curr_tran
+    global service_id
+    global stockorders_db
+
+    for i in range(len(config.order_ports)-1, -1,-1):
+        if i == service_id-1:
+            continue
+        try:
+            hostAddr = config.order_hostname + ':' + str(config.order_ports[i])
+            logger.info(f"Sending IsAlive to the order service instance at {hostAddr}")
+            with grpc.insecure_channel(hostAddr) as channel:
+                stub = stocktrade_pb2_grpc.OrderServiceStub(channel)
+                alive_response = stub.IsAlive(stocktrade_pb2.Empty())
+                if alive_response.is_alive:
+                    logger.info(f"Syncing data from the order service instance at {hostAddr}")
+                    with lock:
+                        for orderDBItem in stub.SyncOrderDB(stocktrade_pb2.SyncRequest(max_transaction_number=curr_tran)):
+                            typew = 'SELL' if orderDBItem.trade_type == 1 else 'BUY'
+                            stockorders_db[orderDBItem.transaction_number] = order.Order(
+                                order_id=orderDBItem.transaction_number, stockname=orderDBItem.stockname, trade_type=typew, quantity=orderDBItem.quantity)
+                    # TODO: should we keep dump to disk in the lock or not
+                    dump_to_disk()
+                    break
+        except grpc.RpcError as rpc_error:
+            if rpc_error.code() == grpc.StatusCode.UNAVAILABLE:
+                logger.error(f"Order service instance at {hostAddr} is not alive/unavailable")
+            else:
+                logger.error(f" Failed to connect the Order service instance at {hostAddr}\nException: {rpc_error}")
+        except Exception as e:
+            logger.error(f" Failed to connect the Order service instance at {hostAddr}\nException: {e}")
+    return
+
+
 def getHostAddr():
     # returns the host address for the order service based on its service_id
     global service_id
@@ -267,6 +315,7 @@ if __name__ == '__main__':
             # start the server on hostAddr to receive requests
             hostAddr = getHostAddr()
             serve(hostAddr)
+            syncDataBase()
         else:
             print("Order service id is either missing or not in bounds, please start service with a valid ID")
     except KeyboardInterrupt:
