@@ -80,7 +80,7 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
                     # TODO: read lock
                     order_info = stockorders_db[order_id]
                     print(order_info)
-                    trade_type_enum = 1 if order_info.trade_type=='SELL' else 0
+                    trade_type_enum = 1 if order_info.trade_type=='SELL' else 0 if order_info.trade_type=='BUY' else -1
                     return stocktrade_pb2.OrderLookupResponse(order_id=1, status= 1, stockname=order_info.stockname,
                              trade_type=trade_type_enum, quantity=order_info.quantity)
             # if order is not present in database return status as -1
@@ -143,9 +143,9 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
         global stockorders_db
         for k,order_info in stockorders_db.items():
             if k > request.max_transaction_number:
-                trade_type_enum = 1 if order_info.trade_type=='SELL' else 0
+                trade_type_enum = 1 if order_info.trade_type=='SELL' else 0 if order_info.trade_type=='BUY' else -1
                 yield stocktrade_pb2.OrderDBItem(
-                    stockname=order_info.stockname, trade_type=trade_type_enum, quantity=order_info.quantity, transaction_number=order_info.transaction_number)
+                    stockname=order_info.stockname, trade_type=trade_type_enum, quantity=order_info.quantity, transaction_number=order_info.order_id)
 
 
 def replicate_order(transaction_number, stockname, trade_type, quantity):
@@ -181,6 +181,8 @@ def serve(hostAddr):
     # to connect between 2 machines, keep the server hostname here with port eg: "elnux3.cs.umass.edu:50051"
     server.add_insecure_port(hostAddr)
     server.start()
+    syncDataBase()
+    logger.info(f"Starting server...")
     server.wait_for_termination()
 
 
@@ -280,6 +282,7 @@ def syncDataBase():
                     with lock:
                         for orderDBItem in stub.SyncOrderDB(stocktrade_pb2.SyncRequest(max_transaction_number=curr_tran)):
                             trade_type_word = 'SELL' if orderDBItem.trade_type == 1 else 'BUY'
+                            curr_tran = max(curr_tran, orderDBItem.transaction_number)
                             stockorders_db[orderDBItem.transaction_number] = order.Order(
                                 order_id=orderDBItem.transaction_number, stockname=orderDBItem.stockname, trade_type=trade_type_word, quantity=orderDBItem.quantity)
                     # TODO: should we keep dump to disk in the lock or not
@@ -319,7 +322,6 @@ if __name__ == '__main__':
             # start the server on hostAddr to receive requests
             hostAddr = getHostAddr()
             serve(hostAddr)
-            syncDataBase()
         else:
             print("Order service id is either missing or not in bounds, please start service with a valid ID")
     except KeyboardInterrupt:
