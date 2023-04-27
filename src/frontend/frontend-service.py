@@ -159,10 +159,11 @@ def trade(stockname, quantity, trade_type):
         #call order service
         # hostAddr = config.order_hostname + ':' + str(config.order_port)
         hostAddr = getHostAddr()
+        trade_type_enum = 1 if trade_type=='SELL' else 0
         with grpc.insecure_channel(hostAddr) as channel:
             stub = stocktrade_pb2_grpc.OrderServiceStub(channel)
             order_response = stub.Trade(stocktrade_pb2.TradeRequest(
-                stockname=stockname, quantity=quantity, trade_type=trade_type))
+                stockname=stockname, quantity=quantity, trade_type=trade_type_enum))
             logger.info(
                 f"Trade request: {stockname}, {quantity}, response status : {order_response.status}")
             if (order_response.status == 1):

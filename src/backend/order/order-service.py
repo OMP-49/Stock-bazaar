@@ -27,22 +27,22 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
     def Trade(self, request, context):
         ''' 
         Funtion to return the transaction status and transaction number for a requested trade order
-        :param  request: contains the stockname, trade type and quantity
+        :param  request: contains the stockname, trade type (enum) and quantity
         :return response: contains the stockname, transaction status and number
         '''
         try:
             name = request.stockname
             type = request.trade_type
             quantity = request.quantity
-            typew = 'SELL' if type == 1 else 'BUY'
-            logger.info(f'Received Trade request for: {name},{typew},{quantity} on order-service_{service_id}')
+            trade_type_word = 'SELL' if type == 1 else 'BUY'
+            logger.info(f'Received Trade request for: {name},{trade_type_word},{quantity} on order-service_{service_id}')
     
             hostAddr = config.catalog_hostname + ':' + str(config.catalog_port)
             # sending the trade request to catalog for checking and updating the stockDB at catalog
             with grpc.insecure_channel(hostAddr) as channel:
                 stub = stocktrade_pb2_grpc.CatalogServiceStub(channel)
                 response = stub.Update(stocktrade_pb2.UpdateRequest(stockname=name, trade_type=type, quantity=quantity ))
-                logger.info(f"Trade request: {name},{typew},{quantity}, response: status: {response.status}")
+                logger.info(f"Trade request: {name},{trade_type_word},{quantity}, response: status: {response.status}")
                 global updated_stocks_queue
                 updated_stocks_queue.put(name)
                 # if trade is processed correctly, increase the transaction number and save it to in-memory stockorders_db
@@ -52,10 +52,10 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
                         global curr_tran
                         global stockorders_db
                         curr_tran = curr_tran + 1
-                        stockorders_db[curr_tran] = order.Order(order_id=curr_tran, stockname=name, trade_type=typew, quantity=quantity)
+                        stockorders_db[curr_tran] = order.Order(order_id=curr_tran, stockname=name, trade_type=trade_type_word, quantity=quantity)
                         write_order_to_file()
                         # TODO: can run replicate_order on seperate thread instead of sequentially
-                        replicate_order(curr_tran, name, typew, quantity)
+                        replicate_order(curr_tran, name, type, quantity)
                         return stocktrade_pb2.TradeResponse(stockname=name,status=response.status, transaction_number=curr_tran)
                 # if trade is not processed, return status with transaction number -1 to indicate failure.
                 return stocktrade_pb2.TradeResponse(stockname=name,status=response.status, transaction_number=-1)
@@ -80,8 +80,9 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
                     # TODO: read lock
                     order_info = stockorders_db[order_id]
                     print(order_info)
+                    trade_type_enum = 1 if order_info.trade_type=='SELL' else 0
                     return stocktrade_pb2.OrderLookupResponse(order_id=1, status= 1, stockname=order_info.stockname,
-                             trade_type=order_info.trade_type, quantity=order_info.quantity)
+                             trade_type=trade_type_enum, quantity=order_info.quantity)
             # if order is not present in database return status as -1
             return stocktrade_pb2.OrderLookupResponse(order_id=order_id, status = -1)
         except Exception as e:
@@ -122,13 +123,14 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
         Funtion to sync the latest processed trade request at leader service - stores the order to the local service db
         :param  request:  contains the transaction_number, stockname, trade type and quantity
         '''
-        logger.info(f"Sync Order Request: {request.stockname},{request.trade_type},{request.quantity}, transaction_number: {request.transaction_number} at order-service_{service_id}")
+        trade_type_word = 'SELL' if request.trade_type == 1 else 'BUY'
+        logger.info(f"Sync Order Request: {request.stockname},{trade_type_word},{request.quantity}, transaction_number: {request.transaction_number} at order-service_{service_id}")
         with lock:
             # TODO : write lock
             global curr_tran
             global stockorders_db
             curr_tran = request.transaction_number
-            stockorders_db[curr_tran] = order.Order(order_id=curr_tran, stockname=request.stockname, trade_type=request.trade_type, quantity=request.quantity)
+            stockorders_db[curr_tran] = order.Order(order_id=curr_tran, stockname=request.stockname, trade_type=trade_type_word, quantity=request.quantity)
             write_order_to_file()
         return stocktrade_pb2.Empty()
 
@@ -141,14 +143,16 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
         global stockorders_db
         for k,order_info in stockorders_db.items():
             if k > request.max_transaction_number:
+                trade_type_enum = 1 if order_info.trade_type=='SELL' else 0
                 yield stocktrade_pb2.OrderDBItem(
-                    stockname=order_info.stockname, trade_type=order_info.trade_type, quantity=order_info.quantity, transaction_number=order_info.transaction_number)
+                    stockname=order_info.stockname, trade_type=trade_type_enum, quantity=order_info.quantity, transaction_number=order_info.transaction_number)
 
 
 def replicate_order(transaction_number, stockname, trade_type, quantity):
     '''
     Function to send the latest successful trade order to the replica order services to maintain data sync
     '''
+    # trade_type - enum format
     global service_id
     for i in range(len(config.order_ports)):
         if i == service_id-1:
@@ -275,9 +279,9 @@ def syncDataBase():
                     logger.info(f"Syncing data from the order service instance at {hostAddr}")
                     with lock:
                         for orderDBItem in stub.SyncOrderDB(stocktrade_pb2.SyncRequest(max_transaction_number=curr_tran)):
-                            typew = 'SELL' if orderDBItem.trade_type == 1 else 'BUY'
+                            trade_type_word = 'SELL' if orderDBItem.trade_type == 1 else 'BUY'
                             stockorders_db[orderDBItem.transaction_number] = order.Order(
-                                order_id=orderDBItem.transaction_number, stockname=orderDBItem.stockname, trade_type=typew, quantity=orderDBItem.quantity)
+                                order_id=orderDBItem.transaction_number, stockname=orderDBItem.stockname, trade_type=trade_type_word, quantity=orderDBItem.quantity)
                     # TODO: should we keep dump to disk in the lock or not
                     dump_to_disk()
                     break
