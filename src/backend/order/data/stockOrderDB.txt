@@ -1,6 +1,0 @@
-transaction_number,stockname,ordertype,quantity
-1,stock3,SELL,25
-2,stock4,SELL,25
-3,stock2,BUY,1
-4,stock4,BUY,10
-5,stock3,SELL,24

@@ -32,3 +32,10 @@ max_order_quantity = 30
 
 # number of lookup and optional trade requests sent from client in a single session 
 num_session_requests = 10
+
+# minimum and maximum order service IDs - IDs are expected to be given in sequential order ranging bw min and max
+minID = 1
+maxID = 3
+
+# port numbers for order service instances - in order from minID to maxID
+order_ports = [9721,9722,9723]
