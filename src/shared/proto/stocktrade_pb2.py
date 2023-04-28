@@ -13,15 +13,15 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x10stocktrade.proto\"\"\n\rLookupRequest\x12\x11\n\tstockname\x18\x01 \x01(\t\"B\n\x0eLookupResponse\x12\x11\n\tstockname\x18\x01 \x01(\t\x12\r\n\x05price\x18\x02 \x01(\x01\x12\x0e\n\x06volume\x18\x03 \x01(\x03\"T\n\rUpdateRequest\x12\x11\n\tstockname\x18\x01 \x01(\t\x12\x1e\n\ntrade_type\x18\x02 \x01(\x0e\x32\n.TradeType\x12\x10\n\x08quantity\x18\x03 \x01(\x03\"3\n\x0eUpdateResponse\x12\x11\n\tstockname\x18\x01 \x01(\t\x12\x0e\n\x06status\x18\x02 \x01(\x11\"S\n\x0cTradeRequest\x12\x11\n\tstockname\x18\x01 \x01(\t\x12\x1e\n\ntrade_type\x18\x02 \x01(\x0e\x32\n.TradeType\x12\x10\n\x08quantity\x18\x03 \x01(\x03\"N\n\rTradeResponse\x12\x11\n\tstockname\x18\x01 \x01(\t\x12\x0e\n\x06status\x18\x02 \x01(\x11\x12\x1a\n\x12transaction_number\x18\x03 \x01(\x03\"&\n\x12OrderLookupRequest\x12\x10\n\x08order_id\x18\x01 \x01(\x03\"|\n\x13OrderLookupResponse\x12\x10\n\x08order_id\x18\x01 \x01(\x03\x12\x0e\n\x06status\x18\x02 \x01(\x11\x12\x11\n\tstockname\x18\x03 \x01(\t\x12\x1e\n\ntrade_type\x18\x04 \x01(\x0e\x32\n.TradeType\x12\x10\n\x08quantity\x18\x05 \x01(\x03\"+\n\x16\x43\x61\x63heInvalidateRequest\x12\x11\n\tstockname\x18\x01 \x01(\t\"\x07\n\x05\x45mpty*\x1e\n\tTradeType\x12\x07\n\x03\x42UY\x10\x00\x12\x08\n\x04SELL\x10\x01\x32j\n\x0e\x43\x61talogService\x12+\n\x06Lookup\x12\x0e.LookupRequest\x1a\x0f.LookupResponse\"\x00\x12+\n\x06Update\x12\x0e.UpdateRequest\x1a\x0f.UpdateResponse\"\x00\x32\xc6\x01\n\x0cOrderService\x12(\n\x05Trade\x12\r.TradeRequest\x1a\x0e.TradeResponse\"\x00\x12:\n\x0bOrderLookup\x12\x13.OrderLookupRequest\x1a\x14.OrderLookupResponse\"\x00\x12\x36\n\x0fStreamDBUpdates\x12\x06.Empty\x1a\x17.CacheInvalidateRequest\"\x00\x30\x01\x12\x18\n\x04Save\x12\x06.Empty\x1a\x06.Empty\"\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x10stocktrade.proto\"\"\n\rLookupRequest\x12\x11\n\tstockname\x18\x01 \x01(\t\"B\n\x0eLookupResponse\x12\x11\n\tstockname\x18\x01 \x01(\t\x12\r\n\x05price\x18\x02 \x01(\x01\x12\x0e\n\x06volume\x18\x03 \x01(\x03\"T\n\rUpdateRequest\x12\x11\n\tstockname\x18\x01 \x01(\t\x12\x1e\n\ntrade_type\x18\x02 \x01(\x0e\x32\n.TradeType\x12\x10\n\x08quantity\x18\x03 \x01(\x03\"3\n\x0eUpdateResponse\x12\x11\n\tstockname\x18\x01 \x01(\t\x12\x0e\n\x06status\x18\x02 \x01(\x11\"S\n\x0cTradeRequest\x12\x11\n\tstockname\x18\x01 \x01(\t\x12\x1e\n\ntrade_type\x18\x02 \x01(\x0e\x32\n.TradeType\x12\x10\n\x08quantity\x18\x03 \x01(\x03\"N\n\rTradeResponse\x12\x11\n\tstockname\x18\x01 \x01(\t\x12\x0e\n\x06status\x18\x02 \x01(\x11\x12\x1a\n\x12transaction_number\x18\x03 \x01(\x03\"&\n\x12OrderLookupRequest\x12\x10\n\x08order_id\x18\x01 \x01(\x03\"|\n\x13OrderLookupResponse\x12\x10\n\x08order_id\x18\x01 \x01(\x03\x12\x0e\n\x06status\x18\x02 \x01(\x11\x12\x11\n\tstockname\x18\x03 \x01(\t\x12\x1e\n\ntrade_type\x18\x04 \x01(\x0e\x32\n.TradeType\x12\x10\n\x08quantity\x18\x05 \x01(\x03\"+\n\x16\x43\x61\x63heInvalidateRequest\x12\x11\n\tstockname\x18\x01 \x01(\t\"\x07\n\x05\x45mpty\"!\n\rAliveResponse\x12\x10\n\x08is_alive\x18\x01 \x01(\x08\"n\n\x0bOrderDBItem\x12\x11\n\tstockname\x18\x01 \x01(\t\x12\x1e\n\ntrade_type\x18\x02 \x01(\x0e\x32\n.TradeType\x12\x10\n\x08quantity\x18\x03 \x01(\x03\x12\x1a\n\x12transaction_number\x18\x04 \x01(\x03\"-\n\x0bSyncRequest\x12\x1e\n\x16max_transaction_number\x18\x01 \x01(\x03\"%\n\x10SetLeaderRequest\x12\x11\n\tleader_id\x18\x01 \x01(\x03*\x1e\n\tTradeType\x12\x07\n\x03\x42UY\x10\x00\x12\x08\n\x04SELL\x10\x01\x32j\n\x0e\x43\x61talogService\x12+\n\x06Lookup\x12\x0e.LookupRequest\x1a\x0f.LookupResponse\"\x00\x12+\n\x06Update\x12\x0e.UpdateRequest\x1a\x0f.UpdateResponse\"\x00\x32\xf0\x02\n\x0cOrderService\x12(\n\x05Trade\x12\r.TradeRequest\x1a\x0e.TradeResponse\"\x00\x12:\n\x0bOrderLookup\x12\x13.OrderLookupRequest\x1a\x14.OrderLookupResponse\"\x00\x12\x36\n\x0fStreamDBUpdates\x12\x06.Empty\x1a\x17.CacheInvalidateRequest\"\x00\x30\x01\x12\x18\n\x04Save\x12\x06.Empty\x1a\x06.Empty\"\x00\x12#\n\x07IsAlive\x12\x06.Empty\x1a\x0e.AliveResponse\"\x00\x12*\n\x10SyncOrderRequest\x12\x0c.OrderDBItem\x1a\x06.Empty\"\x00\x12-\n\x0bSyncOrderDB\x12\x0c.SyncRequest\x1a\x0c.OrderDBItem\"\x00\x30\x01\x12(\n\tSetLeader\x12\x11.SetLeaderRequest\x1a\x06.Empty\"\x00\x62\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'stocktrade_pb2', globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
-  _TRADETYPE._serialized_start=648
-  _TRADETYPE._serialized_end=678
+  _TRADETYPE._serialized_start=881
+  _TRADETYPE._serialized_end=911
   _LOOKUPREQUEST._serialized_start=20
   _LOOKUPREQUEST._serialized_end=54
   _LOOKUPRESPONSE._serialized_start=56
@@ -42,8 +42,16 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _CACHEINVALIDATEREQUEST._serialized_end=637
   _EMPTY._serialized_start=639
   _EMPTY._serialized_end=646
-  _CATALOGSERVICE._serialized_start=680
-  _CATALOGSERVICE._serialized_end=786
-  _ORDERSERVICE._serialized_start=789
-  _ORDERSERVICE._serialized_end=987
+  _ALIVERESPONSE._serialized_start=648
+  _ALIVERESPONSE._serialized_end=681
+  _ORDERDBITEM._serialized_start=683
+  _ORDERDBITEM._serialized_end=793
+  _SYNCREQUEST._serialized_start=795
+  _SYNCREQUEST._serialized_end=840
+  _SETLEADERREQUEST._serialized_start=842
+  _SETLEADERREQUEST._serialized_end=879
+  _CATALOGSERVICE._serialized_start=913
+  _CATALOGSERVICE._serialized_end=1019
+  _ORDERSERVICE._serialized_start=1022
+  _ORDERSERVICE._serialized_end=1390
 # @@protoc_insertion_point(module_scope)

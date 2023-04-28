@@ -7,6 +7,12 @@ BUY: TradeType
 DESCRIPTOR: _descriptor.FileDescriptor
 SELL: TradeType
 
+class AliveResponse(_message.Message):
+    __slots__ = ["is_alive"]
+    IS_ALIVE_FIELD_NUMBER: _ClassVar[int]
+    is_alive: bool
+    def __init__(self, is_alive: bool = ...) -> None: ...
+
 class CacheInvalidateRequest(_message.Message):
     __slots__ = ["stockname"]
     STOCKNAME_FIELD_NUMBER: _ClassVar[int]
@@ -33,6 +39,18 @@ class LookupResponse(_message.Message):
     volume: int
     def __init__(self, stockname: _Optional[str] = ..., price: _Optional[float] = ..., volume: _Optional[int] = ...) -> None: ...
 
+class OrderDBItem(_message.Message):
+    __slots__ = ["quantity", "stockname", "trade_type", "transaction_number"]
+    QUANTITY_FIELD_NUMBER: _ClassVar[int]
+    STOCKNAME_FIELD_NUMBER: _ClassVar[int]
+    TRADE_TYPE_FIELD_NUMBER: _ClassVar[int]
+    TRANSACTION_NUMBER_FIELD_NUMBER: _ClassVar[int]
+    quantity: int
+    stockname: str
+    trade_type: TradeType
+    transaction_number: int
+    def __init__(self, stockname: _Optional[str] = ..., trade_type: _Optional[_Union[TradeType, str]] = ..., quantity: _Optional[int] = ..., transaction_number: _Optional[int] = ...) -> None: ...
+
 class OrderLookupRequest(_message.Message):
     __slots__ = ["order_id"]
     ORDER_ID_FIELD_NUMBER: _ClassVar[int]
@@ -52,6 +70,18 @@ class OrderLookupResponse(_message.Message):
     stockname: str
     trade_type: TradeType
     def __init__(self, order_id: _Optional[int] = ..., status: _Optional[int] = ..., stockname: _Optional[str] = ..., trade_type: _Optional[_Union[TradeType, str]] = ..., quantity: _Optional[int] = ...) -> None: ...
+
+class SetLeaderRequest(_message.Message):
+    __slots__ = ["leader_id"]
+    LEADER_ID_FIELD_NUMBER: _ClassVar[int]
+    leader_id: int
+    def __init__(self, leader_id: _Optional[int] = ...) -> None: ...
+
+class SyncRequest(_message.Message):
+    __slots__ = ["max_transaction_number"]
+    MAX_TRANSACTION_NUMBER_FIELD_NUMBER: _ClassVar[int]
+    max_transaction_number: int
+    def __init__(self, max_transaction_number: _Optional[int] = ...) -> None: ...
 
 class TradeRequest(_message.Message):
     __slots__ = ["quantity", "stockname", "trade_type"]
