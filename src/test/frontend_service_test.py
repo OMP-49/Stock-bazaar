@@ -254,28 +254,7 @@ class TestFrontendService(unittest.TestCase):
         self.assertTrue(lookup_response['data']['quantity'] == lookup_response['data']['quantity'])
         conn.close()
     
-    # def test_order_request_should_invalidate_cache(self):
-    #     '''
-    #     Function to test cache
-    #     '''
-    #     print("Test second lookup request should return from cache")
-    #     conn = http.client.HTTPConnection(FRONTEND_HOSTNAME, FRONTEND_PORT)
-    #     #Initial request sent to catalog service
-    #     lookup_response = send_get_request(conn,'/stocks?stockname=stock2')
-    #     self.assertTrue(lookup_response != None)
-    #     self.assertTrue('data' in lookup_response)
-    #     self.assertTrue(lookup_response['data']['name'] == 'stock2')
-
-    #     #Second request sent to cache
-    #     lookup_response_cache = send_get_request(conn,'/stocks?stockname=stock2')
-    #     self.assertTrue(lookup_response_cache != None)
-    #     self.assertTrue('data' in lookup_response_cache)
-    #     self.assertTrue(lookup_response['data']['name'] == lookup_response['data']['name'])
-    #     self.assertTrue(lookup_response['data']['price'] == lookup_response['data']['price'])
-    #     self.assertTrue(lookup_response['data']['quantity'] == lookup_response['data']['quantity'])
-    #     conn.close()
-
-
+   
 if __name__ == '__main__':
     testNormalWorking()
     # testLookupLatency()
