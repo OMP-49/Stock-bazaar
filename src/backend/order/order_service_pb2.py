@@ -14,9 +14,9 @@ stockorders_db = {}     # stock orders db to store all the stock trade requests
 curr_tran = 0           # current transaction number to keep track of transactions
 lock = Lock()           # lock to access the above global variables
 updated_stocks_queue = Queue()             # queue to stream db updates
-leader_id = 0
+leader_id = 0           # leaderid elected by the frontend
 logger = logging.logger('order-service')
-service_id = 0
+service_id = 0          # id of the current service
 
 class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
 
@@ -91,8 +91,14 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
             return stocktrade_pb2.LookupResponse(order_id=order_id, status = -1)
     
     def StreamDBUpdates(self, request, context):
+        ''' 
+        Funtion to send updates occured in the db to the frontend to keep the cache updated
+        :param  request:  empty request
+        :return response: response contains the stockname that is traded recently
+        '''
         global updated_stocks_queue
         while True:
+            # keep sending the updated stocknames as long as the queue is non-empty
             if (not updated_stocks_queue.empty()):
                 yield stocktrade_pb2.CacheInvalidateRequest(stockname= updated_stocks_queue.get())          
 
@@ -155,6 +161,7 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
         '''
         global stockorders_db
         for k,order_info in stockorders_db.items():
+            # only sends the data with transaction numbers greater than the highest transaction number of the sender service 
             if k > request.max_transaction_number:
                 trade_type_enum = 1 if order_info.trade_type=='SELL' else 0 if order_info.trade_type=='BUY' else -1
                 yield stocktrade_pb2.OrderDBItem(
@@ -167,6 +174,7 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
         # trade_type - enum format
         global service_id
         for i in range(len(config.order_ports)):
+            # skips sending replicate request to self
             if i == service_id-1:
                 continue
             hostAddr = config.order_hostname + ':' + str(config.order_ports[i])
