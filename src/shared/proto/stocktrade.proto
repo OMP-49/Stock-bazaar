@@ -14,6 +14,7 @@ service OrderService{
     rpc SyncOrderRequest(OrderDBItem) returns (Empty) {}
     rpc SyncOrderDB(SyncRequest) returns (stream OrderDBItem) {}
     rpc SetLeader(SetLeaderRequest) returns (Empty) {}
+    rpc GetLeader(Empty) returns (GetLeaderResponse) {} 
 }
 
 message LookupRequest{
@@ -91,5 +92,9 @@ message SyncRequest{
 }
 
 message SetLeaderRequest{
+    int64 leader_id = 1;
+}
+
+message GetLeaderResponse{
     int64 leader_id = 1;
 }

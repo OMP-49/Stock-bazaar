@@ -43,11 +43,11 @@ def load_stockorders_db():
     
     logger.info("Loading stock orders from local disk database")
     # add the stock objects to db
-    global service_id
+    # global service_id
     order_service_pb2.stockorders_db = {}
     order_service_pb2.curr_tran = 0
     try:
-        with open(f'data/stockOrderDB_{service_id}.txt') as file:
+        with open(f'data/stockOrderDB_{order_service_pb2.service_id}.txt') as file:
             # to skip the first line - first line is header
             file.readline()
             for line in file:
@@ -68,12 +68,12 @@ def dump_to_disk():
     '''
     
     logger.info("Saving data to disk...")
-    global service_id
+    # global service_id
     try:
         # Adding header to the database
         header = ['transaction_number,stockname,ordertype,quantity'] 
         lines = header + [value.to_string() for value in order_service_pb2.stockorders_db.values()]
-        with open(f'data/stockOrderDB_{service_id}.txt','w') as file:
+        with open(f'data/stockOrderDB_{order_service_pb2.service_id}.txt','w') as file:
             file.write('\n'.join(lines))
         logger.info("Done!")
     except Exception as e:
@@ -86,28 +86,36 @@ def syncDBOnStart():
     '''
     
     logger.info("Syncing database...")
-    global service_id
+    # global service_id
 
     for i in range(len(config.order_ports)-1, -1,-1):
-        if i == service_id-1:
+        if i == order_service_pb2.service_id-1:
             continue
         try:
             hostAddr = config.order_hostname + ':' + str(config.order_ports[i])
-            logger.info(f"Sending IsAlive to the order service instance at {hostAddr}")
+            logger.info(f"Sending GetLeader to the order service instance at {hostAddr}")
             with grpc.insecure_channel(hostAddr) as channel:
                 stub = stocktrade_pb2_grpc.OrderServiceStub(channel)
-                alive_response = stub.IsAlive(stocktrade_pb2.Empty())
-                if alive_response.is_alive:
-                    logger.info(f"Syncing data from the order service instance at {hostAddr}")
-                    with lock:
-                        for orderDBItem in stub.SyncOrderDB(stocktrade_pb2.SyncRequest(max_transaction_number=order_service_pb2.curr_tran)):
-                            trade_type_word = 'SELL' if orderDBItem.trade_type == 1 else 'BUY'
-                            order_service_pb2.curr_tran = max(order_service_pb2.curr_tran, orderDBItem.transaction_number)
-                            order_service_pb2.stockorders_db[orderDBItem.transaction_number] = order.Order(
-                                order_id=orderDBItem.transaction_number, stockname=orderDBItem.stockname, trade_type=trade_type_word, quantity=orderDBItem.quantity)
-                    # TODO: should we keep dump to disk in the lock or not
-                    dump_to_disk()
-                    break
+                getleader_response = stub.GetLeader(stocktrade_pb2.Empty())
+                if getleader_response.leader_id != 0:
+                    order_service_pb2.leader_id = getleader_response.leader_id
+                    try:
+                        hostAddr2 = config.order_hostname + ':' + str(config.order_ports[getleader_response.leader_id-1])
+                        logger.info(f"Syncing data from the Leader order service instance at {hostAddr2}")
+                        with grpc.insecure_channel(hostAddr2) as channel2:
+                            stub2 = stocktrade_pb2_grpc.OrderServiceStub(channel2)            
+                            with lock:
+                                for orderDBItem in stub2.SyncOrderDB(stocktrade_pb2.SyncRequest(max_transaction_number=order_service_pb2.curr_tran)):
+                                    trade_type_word = 'SELL' if orderDBItem.trade_type == 1 else 'BUY'
+                                    order_service_pb2.curr_tran = max(order_service_pb2.curr_tran, orderDBItem.transaction_number)
+                                    order_service_pb2.stockorders_db[orderDBItem.transaction_number] = order.Order(
+                                        order_id=orderDBItem.transaction_number, stockname=orderDBItem.stockname, trade_type=trade_type_word, quantity=orderDBItem.quantity)
+                            # TODO: should we keep dump to disk in the lock or not
+                            dump_to_disk()
+                            break
+                    except Exception as e:
+                        logger.error(f" Failed to Sync DB with the leader service at {hostAddr2}\nException: {e}")
+                        continue
         except grpc.RpcError as rpc_error:
             if rpc_error.code() == grpc.StatusCode.UNAVAILABLE:
                 logger.error(f"Order service instance at {hostAddr} is not alive/unavailable")
@@ -120,9 +128,9 @@ def syncDBOnStart():
 
 def getHostAddr():
     # returns the host address for the order service based on its service_id
-    global service_id
-    if service_id >= config.minID and service_id <= config.maxID:
-        return config.order_hostname + ':' + str(config.order_ports[service_id-1])
+    # global service_id
+    if order_service_pb2.service_id >= config.minID and order_service_pb2.service_id <= config.maxID:
+        return config.order_hostname + ':' + str(config.order_ports[order_service_pb2.service_id-1])
     else:
         print("Invalid order service id number")
         return ""
@@ -135,8 +143,8 @@ if __name__ == '__main__':
         parser.add_argument('-id', type=int, default=-1, help='input order service id for this instance')
         args = parser.parse_args()
         if args.id >= config.minID  and args.id <= config.maxID:
-            global service_id
-            service_id = args.id    
+            # global service_id
+            order_service_pb2.service_id = args.id
             # initialize database
             load_stockorders_db()
             # start the server on hostAddr to receive requests

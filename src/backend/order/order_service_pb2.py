@@ -16,6 +16,7 @@ lock = Lock()           # lock to access the above global variables
 updated_stocks_queue = Queue()             # queue to stream db updates
 leader_id = 0
 logger = logging.logger('order-service')
+service_id = 0
 
 class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
 
@@ -34,6 +35,7 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
             type = request.trade_type
             quantity = request.quantity
             trade_type_word = 'SELL' if type == 1 else 'BUY'
+            global service_id
             logger.info(f'Received Trade request for: {name},{trade_type_word},{quantity} on order-service_{service_id}')
     
             hostAddr = config.catalog_hostname + ':' + str(config.catalog_port)
@@ -70,6 +72,7 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
         status field is also added in the response. If the order is found, status is set to 1, otherwise -1.
         '''
         try:
+            global service_id
             order_id = int(request.order_id)  # id of the order to perform lookup on
             logger.info(f'Received lookup request for order: {order_id} on order service {service_id}')
             # if the order is present in database return name, type, and quantity from db
@@ -117,12 +120,24 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
         leader_id = request.leader_id
         return stocktrade_pb2.Empty()
 
+
+    def GetLeader(self, request, context):
+        ''' 
+        Funtion to get the leader from the replica order services
+        :param  request:  Empty request
+        :return response: respone contains the leader_id even if its 0, we will check at the request sender side for this 0 condition.
+        '''
+        global leader_id
+        return stocktrade_pb2.GetLeaderResponse(leader_id=leader_id)
+
+
     def SyncOrderRequest(self, request, context):
         ''' 
         Funtion to sync the latest processed trade request at leader service - stores the order to the local service db
         :param  request:  contains the transaction_number, stockname, trade type and quantity
         '''
         trade_type_word = 'SELL' if request.trade_type == 1 else 'BUY'
+        global service_id
         logger.info(f"Sync Order Request: {request.stockname},{trade_type_word},{request.quantity}, transaction_number: {request.transaction_number} at order-service_{service_id}")
         with lock:
             # TODO : write lock
@@ -146,7 +161,7 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
                 yield stocktrade_pb2.OrderDBItem(
                     stockname=order_info.stockname, trade_type=trade_type_enum, quantity=order_info.quantity, transaction_number=order_info.order_id)
     
-    def replicate_order(transaction_number, stockname, trade_type, quantity):
+    def replicate_order(self, transaction_number, stockname, trade_type, quantity):
         '''
         Function to send the latest successful trade order to the replica order services to maintain data sync
         '''
@@ -165,7 +180,7 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
                 logger.error(f"Failed to sync transaction with service replica at {hostAddr}, orderId= {transaction_number}\nWith exception: {e}")
         return
     
-    def write_order_to_file():
+    def write_order_to_file(self):
         '''
         Function to write the last processed order to the local disk database.
         '''
