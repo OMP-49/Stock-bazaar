@@ -39,3 +39,6 @@ maxID = 3
 
 # port numbers for order service instances - in order from minID to maxID
 order_ports = [9721,9722,9723]
+
+#cache size
+cache_size = 5

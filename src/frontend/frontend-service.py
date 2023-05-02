@@ -8,6 +8,7 @@ import threading
 from threading import Lock 
 import sys
 sys.path.append('../..')
+from cache import LRUCache
 
 from src.shared.util import logging
 from src import config
@@ -15,7 +16,7 @@ from src.shared.proto import stocktrade_pb2
 from src.shared.proto import stocktrade_pb2_grpc
 from src.shared.model import stock
 
-cache = {}
+cache = LRUCache(config.cache_size)
 lock = Lock()
 leader_id = 0
 
@@ -114,17 +115,17 @@ def lookup(stockname):
     logger.info(f"Sending lookup request for : {stockname}")
     try:
         #check in cache
+        logger.info(f"Performing lookup on stock: {stockname} in cache")
         global cache
-        if stockname in cache:
-            logger.info(f"Performing lookup on stock: {stockname} in cache")
-            with lock:
-                lookup_stock= cache[stockname]
-                response =  {
-                    'name' : lookup_stock.name,
-                    'price' : lookup_stock.getPrice(),
-                    'quantity' : lookup_stock.volume
-                }
-                return get_http_response(response)
+        with lock:
+            cached_stock = cache.get(stockname)
+        if cached_stock is not None:
+            response =  {
+                'name' : cached_stock.name,
+                'price' : cached_stock.getPrice(),
+                'quantity' : cached_stock.volume
+            }
+            return get_http_response(response)
         else:
             #call catalog service
             hostAddr = config.catalog_hostname + ':' + str(config.catalog_port)
@@ -139,7 +140,8 @@ def lookup(stockname):
                         'price' : lookup_response.price,
                         'quantity' : lookup_response.volume
                     }
-                    cache[stockname] = stock.Stock(name= lookup_response.stockname, price= lookup_response.price, vol=lookup_response.volume)
+                    with lock:
+                        cache.put(stockname, stock.Stock(name= lookup_response.stockname, price= lookup_response.price, vol=lookup_response.volume))
                     return get_http_response(response) #prepare http response
                 else:
                     return get_http_error_response(404, 'stock not found') #prepare http error response
@@ -180,6 +182,7 @@ def trade(stockname, quantity, trade_type):
             logger.info(f"Failed to process the trade request\nOrder service instance at {hostAddr} is not alive/unavailable\nException: {rpc_error}")
             global leader_id
             leader_id = 0
+            # TODO : Send Error Message Instead
             logger.info(f"Resending trade request...")
             return trade(stockname, quantity, trade_type)
         else:
@@ -238,9 +241,8 @@ def subscribe_to_db_updates():
             for response in stub.StreamDBUpdates(stocktrade_pb2.Empty()):
                 stockname = response.stockname
                 logger.info(f"Invalidating stock : {stockname} in cache")
-                if stockname in cache:
-                    with lock: 
-                        del cache[stockname]
+                with lock: 
+                    cache.remove(stockname)
     except grpc.RpcError as rpc_error:
         if rpc_error.code() == grpc.StatusCode.UNAVAILABLE:
             logger.info(f"Exception occured during subscribing to db updates\nOrder service instance at {hostAddr} is not alive/unavailable\nException: {rpc_error}")
