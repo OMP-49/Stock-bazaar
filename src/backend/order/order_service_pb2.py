@@ -81,9 +81,8 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
                 with lock:
                     # TODO: read lock
                     order_info = stockorders_db[order_id]
-                    print(order_info)
                     trade_type_enum = 1 if order_info.trade_type=='SELL' else 0 if order_info.trade_type=='BUY' else -1
-                    return stocktrade_pb2.OrderLookupResponse(order_id=1, status= 1, stockname=order_info.stockname,
+                    return stocktrade_pb2.OrderLookupResponse(order_id=order_info.order_id, status= 1, stockname=order_info.stockname,
                              trade_type=trade_type_enum, quantity=order_info.quantity)
             # if order is not present in database return status as -1
             return stocktrade_pb2.OrderLookupResponse(order_id=order_id, status = -1)
