@@ -82,12 +82,12 @@ def dump_to_disk():
 
 def syncDBOnStart():
     '''
-    Function to find one of the available order services and get data from them after coming from a crash
+    Function to get leader from one of the available order services and get data from that leader service. If leader is not elected yet no sync happens
     '''
     
     logger.info("Syncing database...")
     # global service_id
-
+    order_service_pb2.leader_id = 0
     for i in range(len(config.order_ports)-1, -1,-1):
         if i == order_service_pb2.service_id-1:
             continue
@@ -99,23 +99,7 @@ def syncDBOnStart():
                 getleader_response = stub.GetLeader(stocktrade_pb2.Empty())
                 if getleader_response.leader_id != 0:
                     order_service_pb2.leader_id = getleader_response.leader_id
-                    try:
-                        hostAddr2 = config.order_hostname + ':' + str(config.order_ports[getleader_response.leader_id-1])
-                        logger.info(f"Syncing data from the Leader order service instance at {hostAddr2}")
-                        with grpc.insecure_channel(hostAddr2) as channel2:
-                            stub2 = stocktrade_pb2_grpc.OrderServiceStub(channel2)            
-                            with lock:
-                                for orderDBItem in stub2.SyncOrderDB(stocktrade_pb2.SyncRequest(max_transaction_number=order_service_pb2.curr_tran)):
-                                    trade_type_word = 'SELL' if orderDBItem.trade_type == 1 else 'BUY'
-                                    order_service_pb2.curr_tran = max(order_service_pb2.curr_tran, orderDBItem.transaction_number)
-                                    order_service_pb2.stockorders_db[orderDBItem.transaction_number] = order.Order(
-                                        order_id=orderDBItem.transaction_number, stockname=orderDBItem.stockname, trade_type=trade_type_word, quantity=orderDBItem.quantity)
-                            # TODO: should we keep dump to disk in the lock or not
-                            dump_to_disk()
-                            break
-                    except Exception as e:
-                        logger.error(f" Failed to Sync DB with the leader service at {hostAddr2}\nException: {e}")
-                        continue
+                    break
         except grpc.RpcError as rpc_error:
             if rpc_error.code() == grpc.StatusCode.UNAVAILABLE:
                 logger.error(f"Order service instance at {hostAddr} is not alive/unavailable")
@@ -123,6 +107,29 @@ def syncDBOnStart():
                 logger.error(f" Failed to connect the Order service instance at {hostAddr}\nException: {rpc_error}")
         except Exception as e:
             logger.error(f" Failed to connect the Order service instance at {hostAddr}\nException: {e}")
+
+    # leader not found or did not elect so not syncing
+    if order_service_pb2.leader_id == 0:
+        return
+    
+    try:
+        hostAddr = config.order_hostname + ':' + str(config.order_ports[order_service_pb2.leader_id-1])
+        logger.info(f"Syncing data from the Leader order service instance at {hostAddr}")
+        with grpc.insecure_channel(hostAddr) as channel:
+            stub = stocktrade_pb2_grpc.OrderServiceStub(channel)            
+            with lock:
+                for orderDBItem in stub.SyncOrderDB(stocktrade_pb2.SyncRequest(max_transaction_number=order_service_pb2.curr_tran)):
+                    trade_type_word = 'SELL' if orderDBItem.trade_type == 1 else 'BUY'
+                    order_service_pb2.curr_tran = max(order_service_pb2.curr_tran, orderDBItem.transaction_number)
+                    order_service_pb2.stockorders_db[orderDBItem.transaction_number] = order.Order(
+                        order_id=orderDBItem.transaction_number, stockname=orderDBItem.stockname, trade_type=trade_type_word, quantity=orderDBItem.quantity)
+            # TODO: should we keep dump to disk in the lock or not
+            dump_to_disk()
+            return
+    except Exception as e:
+        logger.error(f" Failed to connect the Order service instance at {hostAddr}\nException: {e}")
+        logger.error(f"Resyncing the database")
+        syncDBOnStart()
     return
 
 
