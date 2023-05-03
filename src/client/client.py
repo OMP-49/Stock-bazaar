@@ -75,6 +75,8 @@ def testNormalWorking():
     # Send GET request to /stocks?stockname=<stock_name>
     print("Lookup Case: valid stock name")
     send_get_request(conn, '/stocks?stockname=stock2')      # lookup success case
+    print("Lookup Case: valid stock name present in cache")
+    send_get_request(conn, '/stocks?stockname=stock2')      # lookup in cache if enabled
     print("\nLookup Case: invalid stock name")
     send_get_request(conn, '/stocks?stockname=stock6')      # lookup failure case because stock is not present in catalog
 

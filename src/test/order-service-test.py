@@ -125,15 +125,6 @@ class TestOrderService(unittest.TestCase):
         self.assertTrue(order_lookup_response.order_id == INVALID_ORDER_ID)
         self.assertTrue(order_lookup_response.status == 0)
 
-        
-
-
-
-        
-
-
-
-
 if __name__ == '__main__':
     #test order request
     unittest.main()

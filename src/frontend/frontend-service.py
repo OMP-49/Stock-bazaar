@@ -115,10 +115,12 @@ def lookup(stockname):
     logger.info(f"Sending lookup request for : {stockname}")
     try:
         #check in cache
-        logger.info(f"Performing lookup on stock: {stockname} in cache")
-        global cache
-        with lock:
-            cached_stock = cache.get(stockname)
+        cached_stock = None
+        if config.enable_cache == 'Y':
+            logger.info(f"Performing lookup on stock: {stockname} in cache")
+            global cache
+            with lock:
+                cached_stock = cache.get(stockname)
         if cached_stock is not None:
             response =  {
                 'name' : cached_stock.name,
