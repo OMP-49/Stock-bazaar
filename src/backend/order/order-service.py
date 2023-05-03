@@ -31,6 +31,7 @@ def serve(hostAddr):
     # to connect between 2 machines, keep the server hostname here with port eg: "elnux3.cs.umass.edu:50051"
     server.add_insecure_port(hostAddr)
     server.start()
+    # Call to Sync the database on restart (from crash)
     syncDBOnStart()
     logger.info(f"Starting server...")
     server.wait_for_termination()
@@ -47,6 +48,7 @@ def load_stockorders_db():
     order_service_pb2.stockorders_db = {}
     order_service_pb2.curr_tran = 0
     try:
+        # Data is stored in the respective service file of service id. Each replica has a db of its own
         with open(f'data/stockOrderDB_{order_service_pb2.service_id}.txt') as file:
             # to skip the first line - first line is header
             file.readline()
@@ -57,6 +59,7 @@ def load_stockorders_db():
                 order_service_pb2.curr_tran = max(order_service_pb2.curr_tran,trans_num)
         logger.info("Done!")
     except FileNotFoundError as e:
+        # service started for the first time, file not present. File will be created when we start storing transactions
         logger.error(f"DB file is not present, starting server for the first time. File will be created if a trade happens\nException: {e}")
     except Exception as e:
         logger.error(f"cannot read the text, please make sure the formatting in the file is correct\nException: {e}")
@@ -73,6 +76,8 @@ def dump_to_disk():
         # Adding header to the database
         header = ['transaction_number,stockname,ordertype,quantity'] 
         lines = header + [value.to_string() for value in order_service_pb2.stockorders_db.values()]
+        # Data is stored in the respective service file of service id. Each replica has a db of its own
+        # File will be created if its not present
         with open(f'data/stockOrderDB_{order_service_pb2.service_id}.txt','w') as file:
             file.write('\n'.join(lines))
         logger.info("Done!")
@@ -82,12 +87,16 @@ def dump_to_disk():
 
 def syncDBOnStart():
     '''
-    Function to find one of the available order services and get data from them after coming from a crash
+    Syncs the DB from the leader service on start (restarted from crash)
+    Function first gets the leader from one of the available order services, then gets the data from that leader service. 
+    If leader is not elected yet, meaning we are starting servers for the first time so no sync happens.
     '''
     
     logger.info("Syncing database...")
     # global service_id
-
+    
+    # Finding leader 
+    order_service_pb2.leader_id = 0      # resetting leader_id to avoid discrepancies
     for i in range(len(config.order_ports)-1, -1,-1):
         if i == order_service_pb2.service_id-1:
             continue
@@ -97,37 +106,50 @@ def syncDBOnStart():
             with grpc.insecure_channel(hostAddr) as channel:
                 stub = stocktrade_pb2_grpc.OrderServiceStub(channel)
                 getleader_response = stub.GetLeader(stocktrade_pb2.Empty())
+                # If the response contains a non zero leader id value then we can say the leader is found
                 if getleader_response.leader_id != 0:
                     order_service_pb2.leader_id = getleader_response.leader_id
-                    try:
-                        hostAddr2 = config.order_hostname + ':' + str(config.order_ports[getleader_response.leader_id-1])
-                        logger.info(f"Syncing data from the Leader order service instance at {hostAddr2}")
-                        with grpc.insecure_channel(hostAddr2) as channel2:
-                            stub2 = stocktrade_pb2_grpc.OrderServiceStub(channel2)            
-                            with lock:
-                                for orderDBItem in stub2.SyncOrderDB(stocktrade_pb2.SyncRequest(max_transaction_number=order_service_pb2.curr_tran)):
-                                    trade_type_word = 'SELL' if orderDBItem.trade_type == 1 else 'BUY'
-                                    order_service_pb2.curr_tran = max(order_service_pb2.curr_tran, orderDBItem.transaction_number)
-                                    order_service_pb2.stockorders_db[orderDBItem.transaction_number] = order.Order(
-                                        order_id=orderDBItem.transaction_number, stockname=orderDBItem.stockname, trade_type=trade_type_word, quantity=orderDBItem.quantity)
-                            # TODO: should we keep dump to disk in the lock or not
-                            dump_to_disk()
-                            break
-                    except Exception as e:
-                        logger.error(f" Failed to Sync DB with the leader service at {hostAddr2}\nException: {e}")
-                        continue
+                    break
         except grpc.RpcError as rpc_error:
+            # If a particular replica service is not available, we will skip it and send getleader request to next replica
             if rpc_error.code() == grpc.StatusCode.UNAVAILABLE:
                 logger.error(f"Order service instance at {hostAddr} is not alive/unavailable")
             else:
                 logger.error(f" Failed to connect the Order service instance at {hostAddr}\nException: {rpc_error}")
         except Exception as e:
             logger.error(f" Failed to connect the Order service instance at {hostAddr}\nException: {e}")
+
+    # leader not found or did not elect yet - so not syncing
+    if order_service_pb2.leader_id == 0:
+        return
+    
+    # Syncing DB with the leader service
+    try:
+        hostAddr = config.order_hostname + ':' + str(config.order_ports[order_service_pb2.leader_id-1])
+        logger.info(f"Syncing data from the Leader order service instance at {hostAddr}")
+        with grpc.insecure_channel(hostAddr) as channel:
+            stub = stocktrade_pb2_grpc.OrderServiceStub(channel)            
+            with lock:
+                # looping through the stream response from the leader service
+                for orderDBItem in stub.SyncOrderDB(stocktrade_pb2.SyncRequest(max_transaction_number=order_service_pb2.curr_tran)):
+                    trade_type_word = 'SELL' if orderDBItem.trade_type == 1 else 'BUY'
+                    # current transaction has to be updated too so that new transactions will be continued from the latest transaction number
+                    order_service_pb2.curr_tran = max(order_service_pb2.curr_tran, orderDBItem.transaction_number)
+                    order_service_pb2.stockorders_db[orderDBItem.transaction_number] = order.Order(
+                        order_id=orderDBItem.transaction_number, stockname=orderDBItem.stockname, trade_type=trade_type_word, quantity=orderDBItem.quantity)
+            # TODO: should we keep dump to disk in the lock or not
+            dump_to_disk()
+            return
+    except Exception as e:
+        logger.error(f" Failed to connect the Order service instance at {hostAddr}\nException: {e}")
+        logger.error(f"Resyncing the database")
+        # If the leader service is not present or some exception happens, we will retry the syncing process hoping an alive leader is elected and broadcasted.
+        syncDBOnStart()
     return
 
 
 def getHostAddr():
-    # returns the host address for the order service based on its service_id
+    # returns the host address for the order service based on its service_id from the config
     # global service_id
     if order_service_pb2.service_id >= config.minID and order_service_pb2.service_id <= config.maxID:
         return config.order_hostname + ':' + str(config.order_ports[order_service_pb2.service_id-1])
@@ -142,6 +164,8 @@ if __name__ == '__main__':
         parser = argparse.ArgumentParser(description='OrderService')
         parser.add_argument('-id', type=int, default=-1, help='input order service id for this instance')
         args = parser.parse_args()
+        
+        # We want the given service id to be in bounds to the min, max given in the config file - having bounds will make automating the system easy
         if args.id >= config.minID  and args.id <= config.maxID:
             # global service_id
             order_service_pb2.service_id = args.id
@@ -151,11 +175,12 @@ if __name__ == '__main__':
             hostAddr = getHostAddr()
             serve(hostAddr)
         else:
-            print("Order service id is either missing or not in bounds, please start service with a valid ID")
+            # -id missing or out of bounds
+            print(f"Order service id is either missing or not in bounds, please start service with a valid ID between {config.minID} and {config.maxID}")
     except KeyboardInterrupt:
         logger.warning("Keyboard interrupt")
     except Exception as e:
         logger.error(f"Exiting with exception: {e}")
 
-    # calls the funtion to write back to disk when exiting the server
+    # calls the funtion to write back to disk when exiting the server - commented this since we are writing to db at every transaction
     # atexit.register(dump_to_disk)
