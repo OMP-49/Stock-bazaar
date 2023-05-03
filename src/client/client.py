@@ -155,7 +155,7 @@ def testSession(nlookup, prob):
 
 if __name__ == '__main__':
     # initializing stocks list with a set of stocknames
-    stocks = ['stock'+str(i) for i in range(1,11)]
+    stocks = ['stock'+str(i) for i in range(1,20)]
     testNormalWorking()
     # testSession(10, 100)
 

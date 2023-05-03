@@ -5,7 +5,7 @@ from src.frontend.cache import LRUCache
 
 CACHE_SIZE = 2
 
-class TestCatalogService(unittest.TestCase):
+class TestCaching(unittest.TestCase):
 
     def __init__(self, methodName: str = "runTest") -> None:
         super().__init__(methodName)
