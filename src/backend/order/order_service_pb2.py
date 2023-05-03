@@ -91,10 +91,15 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
             return stocktrade_pb2.LookupResponse(order_id=order_id, status = -1)
     
     def StreamDBUpdates(self, request, context):
-        global updated_stocks_queue
-        while True:
-            if (not updated_stocks_queue.empty()):
-                yield stocktrade_pb2.CacheInvalidateRequest(stockname= updated_stocks_queue.get())          
+        try:
+            global updated_stocks_queue
+            while True:
+                if (not updated_stocks_queue.empty()):
+                    yield stocktrade_pb2.CacheInvalidateRequest(stockname= updated_stocks_queue.get())
+        except Exception as e:
+            logger.error(f"Failed to stream DB events with exception: {e}")
+            self.StreamDBUpdates(request, context)
+
 
     # TODO : Remove Function
     # def Save(self, request, context):
