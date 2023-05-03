@@ -85,7 +85,7 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
                     return stocktrade_pb2.OrderLookupResponse(order_id=order_info.order_id, status= 1, stockname=order_info.stockname,
                              trade_type=trade_type_enum, quantity=order_info.quantity)
             # if order is not present in database return status as -1
-            return stocktrade_pb2.OrderLookupResponse(order_id=order_id, status = -1)
+            return stocktrade_pb2.OrderLookupResponse(order_id=order_id, status = 0)
         except Exception as e:
             logger.error(f"Failed to process lookup request for request : {request} with exception: {e}")
             return stocktrade_pb2.LookupResponse(order_id=order_id, status = -1)
