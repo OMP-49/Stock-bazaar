@@ -142,7 +142,9 @@ def testSession(nlookup, prob):
 
     global orderlookup_count
     global orderlookuptime
+    global orders_placed
 
+    orders_placed = []
     print("Testing session")
     print("Connecting frontend server on port: ", config.frontend_hostname,":",config.frontend_port)
     conn = http.client.HTTPConnection(config.frontend_hostname, config.frontend_port)
@@ -152,7 +154,6 @@ def testSession(nlookup, prob):
     
     # retrieve order information all the placed orders
     print("Checking local information with order information from server")
-    global orders_placed
     for order in orders_placed:
         order_id = order.order_id
         print(f"Running sanity check for order id: {order_id}" )
@@ -168,6 +169,7 @@ def testSession(nlookup, prob):
             assert order_response["data"]["quantity"] == order.quantity
         print(f"Check complete for order id: {order_id}")
     print("Local information consistent with server")
+    orders_placed = []
     conn.close()
     print("Session completed, closing connection")
 
@@ -191,10 +193,11 @@ def PerformanceEvaluation():
     orderlookup_count = 0
     
     num_session_requests = 500
-
+    eval_output = "For Performance Evaluation\n"
     for prob in [0,0.2,0.4,0.6,0.8,1]:
         print("============================================")
         print(f"For prob: {prob}")
+        eval_output += "============================================\n" + f"For prob: {prob}\n"
         testSession(num_session_requests, prob)
 
         lookup_latency_per_req = lookuptime/lookup_count
@@ -204,8 +207,13 @@ def PerformanceEvaluation():
         print('lookup: {:.6f}s per request'.format(lookup_latency_per_req))
         print('trade: {:.6f}s per request'.format(trade_latency_per_req))
         print('orderlookup: {:.6f}s per request'.format(orderlookup_latency_per_req))
-
         print("============================================")
+
+        eval_output += 'lookup: {:.6f}s per request\n'.format(lookup_latency_per_req)
+        eval_output += 'trade: {:.6f}s per request\n'.format(trade_latency_per_req)
+        eval_output += 'orderlookup: {:.6f}s per request\n'.format(orderlookup_latency_per_req)
+        eval_output += ("============================================\n")
+        print(eval_output)
 
 def CachePerformance():
     print("Cache Performance evaluation")
@@ -242,9 +250,8 @@ def CachePerformance():
 
 if __name__ == '__main__':
     # initializing stocks list with a set of stocknames
-    stocks = ['stock'+str(i) for i in range(1,20)]
+    stocks = ['stock'+str(i) for i in range(1,10)]
     testNormalWorking()
     # print("==================================")
     # testSession(config.num_session_requests, config.prob)
     # PerformanceEvaluation()
-    # CachePerformance()
