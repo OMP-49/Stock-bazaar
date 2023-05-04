@@ -240,7 +240,6 @@ def order_lookup(order_id):
 def subscribe_to_db_updates():
     logger.info(f"Subscribing to db updates messages")
     try:
-        # hostAddr = config.order_hostname + ':' + str(config.order_port)
         hostAddr = getHostAddr()
         with grpc.insecure_channel(hostAddr) as channel:
             stub = stocktrade_pb2_grpc.OrderServiceStub(channel)
@@ -260,7 +259,6 @@ def subscribe_to_db_updates():
             print(rpc_error)
     except Exception as e:
         logger.error(f"Failed to subscribe to order updates with exception: {e}")
-
         print(e)
     logger.info(f"Resubscribing to db updates")
     subscribe_to_db_updates()

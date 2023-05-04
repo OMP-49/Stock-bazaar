@@ -13,6 +13,13 @@ else:
     catalog_hostname = 'localhost'
     order_hostname = 'localhost'
 
+#Make this variable True to connect to frontend service deployed on cloud. False when running locally
+mode_cloud = True
+
+# connects to cloud frontend when mode_cloud is true.
+if mode_cloud:
+    frontend_hostname = 'ec2-3-238-71-234.compute-1.amazonaws.com'
+
 # ports on which each service is hosted
 frontend_port = 26111
 catalog_port = 26119

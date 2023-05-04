@@ -98,11 +98,6 @@ class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
             if (not updated_stocks_queue.empty()):
                 yield stocktrade_pb2.CacheInvalidateRequest(stockname= updated_stocks_queue.get())          
 
-    # TODO : Remove Function
-    # def Save(self, request, context):
-    #     dump_to_disk()
-    #     return stocktrade_pb2.Empty()
-
     def IsAlive(self, request, context):
         ''' 
         Funtion to check if the service is alive or not from frontend

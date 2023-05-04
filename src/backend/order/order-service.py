@@ -13,11 +13,7 @@ from src.shared.util import logging
 from src.shared.model import order
 import order_service_pb2
 
-# stockorders_db = {}     # stock orders db to store all the stock trade requests
-# curr_tran = 0           # current transaction number to keep track of transactions
 lock = Lock()           # lock to access the above global variables
-# updated_stocks_queue = Queue()             # queue to stream db updates
-# leader_id = 0
 
 def serve(hostAddr):
     ''' 
@@ -181,6 +177,3 @@ if __name__ == '__main__':
         logger.warning("Keyboard interrupt")
     except Exception as e:
         logger.error(f"Exiting with exception: {e}")
-
-    # calls the funtion to write back to disk when exiting the server - commented this since we are writing to db at every transaction
-    # atexit.register(dump_to_disk)

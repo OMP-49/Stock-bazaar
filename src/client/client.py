@@ -250,7 +250,7 @@ def CachePerformance():
 
 if __name__ == '__main__':
     # initializing stocks list with a set of stocknames
-    stocks = ['stock'+str(i) for i in range(1,10)]
+    stocks = ['stock'+str(i) for i in range(1,12)]
     testNormalWorking()
     # print("==================================")
     # testSession(config.num_session_requests, config.prob)
