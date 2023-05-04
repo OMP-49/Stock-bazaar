@@ -1,9 +1,17 @@
 class Order:
     def __init__(self, order_id, stockname, trade_type, quantity):
-        self.order_id = order_id
-        self.stockname = stockname
-        self.trade_type = trade_type
-        self.quantity = quantity
+        '''
+        Initializes with the order information
+        Arguments:
+        - order_id: The transaction number of the order.
+        - stockname: The name of the stock that was traded.
+        - trade_type: The type of the trade.
+        - quantity: The quantity that was traded.
+        '''
+        self.order_id = order_id # transaction number of the order
+        self.stockname = stockname # name of the stock
+        self.trade_type = trade_type # type of the trade
+        self.quantity = quantity # qnatity traded
     
     def to_string(self):
         '''

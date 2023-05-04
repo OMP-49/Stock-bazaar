@@ -15,14 +15,10 @@ curr_tran = 0           # current transaction number to keep track of transactio
 lock = Lock()           # lock to access the above global variables
 updated_stocks_queue = Queue()             # queue to stream db updates
 leader_id = 0           # leaderid elected by the frontend
-logger = logging.logger('order-service')
+logger = logging.logger('order-service-pb')
 service_id = 0          # id of the current service
 
 class OrderService(stocktrade_pb2_grpc.OrderServiceServicer):
-
-    # def __init__(self, stockorders_db, curr_tran):
-    #     self.stockorders_db = stockorders_db
-    #     self.currTran = curr_tran
 
     def Trade(self, request, context):
         ''' 
