@@ -6,8 +6,8 @@ import sys
 sys.path.append('../../..')
 from src.shared.model import stock
 from src import config
-from src.shared.proto import stocktrade_pb2
-from src.shared.proto import stocktrade_pb2_grpc
+import stocktrade_pb2
+import stocktrade_pb2_grpc
 from src.shared.util import logging
 
 stocks_db = {}      # stocks db to store the stock objects present in the catalog
