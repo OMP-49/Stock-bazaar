@@ -39,3 +39,9 @@ maxID = 3
 
 # port numbers for order service instances - in order from minID to maxID
 order_ports = [9721,9722,9723]
+
+#switch to enable cache. 'Y' to enable cache and 'N' to disable
+enable_cache = 'Y'
+
+#cache size
+cache_size = 5

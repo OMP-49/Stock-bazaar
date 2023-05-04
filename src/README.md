@@ -61,6 +61,11 @@ python -m grpc_tools.protoc -I./ --python_out=. --pyi_out=. --grpc_python_out=. 
 ```
 update the following import in stocktrade_pb2_grpc.py file
 
+Replace
+```
+import stocktrade_pb2 as stocktrade__pb2
+```
+With
 ```
 import sys
 sys.path.append('../../..')

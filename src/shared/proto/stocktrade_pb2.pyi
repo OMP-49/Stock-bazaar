@@ -23,6 +23,12 @@ class Empty(_message.Message):
     __slots__ = []
     def __init__(self) -> None: ...
 
+class GetLeaderResponse(_message.Message):
+    __slots__ = ["leader_id"]
+    LEADER_ID_FIELD_NUMBER: _ClassVar[int]
+    leader_id: int
+    def __init__(self, leader_id: _Optional[int] = ...) -> None: ...
+
 class LookupRequest(_message.Message):
     __slots__ = ["stockname"]
     STOCKNAME_FIELD_NUMBER: _ClassVar[int]

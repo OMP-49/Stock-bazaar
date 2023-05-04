@@ -6,6 +6,7 @@ import unittest
 FRONTEND_HOSTNAME = 'localhost'     # hostname on which frontend server is hosted
 FRONTEND_PORT = 26111               # port on which frontend server is serving
 N_REQ = 500                         # Number of request to send while checking the response latencies (2*N_REQ number of requests will be sent)
+INVALID_ORDER_ID = -1
 
 def send_get_request(conn, path):
     ''' 
@@ -133,7 +134,6 @@ def testTradeLatency():
     # closing connection from client
     conn.close()
 
-
 class TestFrontendService(unittest.TestCase):
     def test_lookup_success_response(self):
         '''
@@ -253,29 +253,48 @@ class TestFrontendService(unittest.TestCase):
         self.assertTrue(lookup_response['data']['price'] == lookup_response['data']['price'])
         self.assertTrue(lookup_response['data']['quantity'] == lookup_response['data']['quantity'])
         conn.close()
+
+    def test_order_lookup_success_response(self):
+        '''
+        Function to test order lookup of an existing order
+        '''
+        print("Test order get request for an already existing order")
+        #precondition checks to ensure order is present in db
+        conn = http.client.HTTPConnection(FRONTEND_HOSTNAME, FRONTEND_PORT)
+        order_response = send_post_request(conn,'/orders','stock1',25,'SELL')
+        self.assertTrue(order_response != None)
+        self.assertTrue('data' in order_response)
+        self.assertTrue('transaction_number' in order_response['data'])
+        order_id = order_response['data']['transaction_number']
+
+        # perfrom lookup on the above order id
+        order_lookup_response = send_get_request(conn, f'/orders?order-number={order_id}')
+        self.assertTrue(order_lookup_response is not None)
+        self.assertTrue('data' in order_lookup_response)
+        self.assertTrue('name' in order_lookup_response['data'])
+        self.assertTrue('number' in order_lookup_response['data'])
+        self.assertTrue('type' in order_lookup_response['data'])
+        self.assertTrue('quantity' in order_lookup_response['data'])
+
+        self.assertTrue(order_lookup_response['data']["name"] == 'stock1')
+        self.assertTrue(order_lookup_response['data']['number'] == order_id)
+        self.assertTrue(order_lookup_response['data']['type'] == 'SELL')
+        self.assertTrue(order_lookup_response['data']['quantity'] == 25)
+        conn.close()
+
+    def test_order_lookup_failure_response(self):
+        '''
+        Function to test failure scenario of order lookup
+        '''
+        print("Test order get request for an invalid order")
+        conn = http.client.HTTPConnection(FRONTEND_HOSTNAME, FRONTEND_PORT)
+        order_lookup_response = send_get_request(conn, f'/orders?order-number={INVALID_ORDER_ID}')
+        self.assertTrue(order_lookup_response != None)
+        self.assertTrue('error' in order_lookup_response)
+        self.assertTrue(order_lookup_response['error']['code'] == 404)
+        conn.close()
     
-    # def test_order_request_should_invalidate_cache(self):
-    #     '''
-    #     Function to test cache
-    #     '''
-    #     print("Test second lookup request should return from cache")
-    #     conn = http.client.HTTPConnection(FRONTEND_HOSTNAME, FRONTEND_PORT)
-    #     #Initial request sent to catalog service
-    #     lookup_response = send_get_request(conn,'/stocks?stockname=stock2')
-    #     self.assertTrue(lookup_response != None)
-    #     self.assertTrue('data' in lookup_response)
-    #     self.assertTrue(lookup_response['data']['name'] == 'stock2')
-
-    #     #Second request sent to cache
-    #     lookup_response_cache = send_get_request(conn,'/stocks?stockname=stock2')
-    #     self.assertTrue(lookup_response_cache != None)
-    #     self.assertTrue('data' in lookup_response_cache)
-    #     self.assertTrue(lookup_response['data']['name'] == lookup_response['data']['name'])
-    #     self.assertTrue(lookup_response['data']['price'] == lookup_response['data']['price'])
-    #     self.assertTrue(lookup_response['data']['quantity'] == lookup_response['data']['quantity'])
-    #     conn.close()
-
-
+   
 if __name__ == '__main__':
     testNormalWorking()
     # testLookupLatency()

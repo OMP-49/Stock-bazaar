@@ -8,6 +8,7 @@ import threading
 from threading import Lock 
 import sys
 sys.path.append('../..')
+from cache import LRUCache
 
 from src.shared.util import logging
 from src import config
@@ -15,7 +16,7 @@ from src.shared.proto import stocktrade_pb2
 from src.shared.proto import stocktrade_pb2_grpc
 from src.shared.model import stock
 
-cache = {}
+cache = LRUCache(config.cache_size)
 lock = Lock()
 leader_id = 0
 
@@ -113,18 +114,22 @@ def lookup(stockname):
     '''
     logger.info(f"Sending lookup request for : {stockname}")
     try:
-        #check in cache
-        global cache
-        if stockname in cache:
+        #check in cache if cache is enabled
+        cached_stock = None
+        if config.enable_cache == 'Y':
             logger.info(f"Performing lookup on stock: {stockname} in cache")
+            global cache
             with lock:
-                lookup_stock= cache[stockname]
-                response =  {
-                    'name' : lookup_stock.name,
-                    'price' : lookup_stock.getPrice(),
-                    'quantity' : lookup_stock.volume
-                }
-                return get_http_response(response)
+                cached_stock = cache.get(stockname)
+        # if stock present in cache return the response
+        if cached_stock is not None:
+            response =  {
+                'name' : cached_stock.name,
+                'price' : cached_stock.getPrice(),
+                'quantity' : cached_stock.volume
+            }
+            return get_http_response(response)
+        # if cache is enabled or stock not present in cache, send request to backend
         else:
             #call catalog service
             hostAddr = config.catalog_hostname + ':' + str(config.catalog_port)
@@ -133,18 +138,23 @@ def lookup(stockname):
                 lookup_response = stub.Lookup(stocktrade_pb2.LookupRequest(stockname= stockname))
                 logger.info(
                     f"Lookup request: {lookup_response.stockname}, response: Price of stock: {lookup_response.price}, Volume of the stock: {lookup_response.volume}")
+                # send data response if returned price is not -1
                 if lookup_response.price != -1:
                     response =  {
                         'name' : lookup_response.stockname,
                         'price' : lookup_response.price,
                         'quantity' : lookup_response.volume
                     }
-                    cache[stockname] = stock.Stock(name= lookup_response.stockname, price= lookup_response.price, vol=lookup_response.volume)
+                    # add the retrieved information to cache
+                    with lock:
+                        cache.put(stockname, stock.Stock(name= lookup_response.stockname, price= lookup_response.price, vol=lookup_response.volume))
                     return get_http_response(response) #prepare http response
+                # send error response if returned price is -1
                 else:
                     return get_http_error_response(404, 'stock not found') #prepare http error response
     except Exception as e:
         logger.error(f"Failed to get lookup response for {stockname} with expception: {e}") 
+    # send internal server error if request failed
     return get_http_error_response(404, 'Internal Server Error')
 
 def trade(stockname, quantity, trade_type):
@@ -238,9 +248,8 @@ def subscribe_to_db_updates():
             for response in stub.StreamDBUpdates(stocktrade_pb2.Empty()):
                 stockname = response.stockname
                 logger.info(f"Invalidating stock : {stockname} in cache")
-                if stockname in cache:
-                    with lock: 
-                        del cache[stockname]
+                with lock: 
+                    cache.remove(stockname)
     except grpc.RpcError as rpc_error:
         if rpc_error.code() == grpc.StatusCode.UNAVAILABLE:
             logger.info(f"Exception occured during subscribing to db updates\nOrder service instance at {hostAddr} is not alive/unavailable\nException: {rpc_error}")
@@ -253,6 +262,7 @@ def subscribe_to_db_updates():
             print(rpc_error)
     except Exception as e:
         logger.error(f"Failed to subscribe to order updates with exception: {e}")
+
         print(e)
 
 #TODO: remove the function (not using)

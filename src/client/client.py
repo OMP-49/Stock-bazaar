@@ -4,9 +4,12 @@ import random
 import sys
 sys.path.append('../..')
 from src import config
+from src.shared.model.order import Order
 
 # stocks contains stocknames that we perform lookup and order requests
 stocks = []
+# data structure to store the list of orders placed in a session
+orders_placed = []
 
 def send_get_request(conn, path):
     ''' 
@@ -72,6 +75,8 @@ def testNormalWorking():
     # Send GET request to /stocks?stockname=<stock_name>
     print("Lookup Case: valid stock name")
     send_get_request(conn, '/stocks?stockname=stock2')      # lookup success case
+    print("Lookup Case: valid stock name present in cache")
+    send_get_request(conn, '/stocks?stockname=stock2')      # lookup in cache if enabled
     print("\nLookup Case: invalid stock name")
     send_get_request(conn, '/stocks?stockname=stock6')      # lookup failure case because stock is not present in catalog
 
@@ -108,7 +113,12 @@ def sendLookupAndOrder(stockname, prob, conn):
             # we select type and quantity parameters in a random manner and send post request
             type = random.choice(['BUY', 'SELL'])
             quantity = random.choice(list(range(1,config.max_order_quantity)))
-            send_post_request(conn,'/orders', stockname, quantity, type)
+            order_response = send_post_request(conn,'/orders', stockname, quantity, type)
+            # store the sent stockname, type, and quantity along with the returned transaction number in a list.
+            if order_response is not None and order_response["data"] is not None:
+                global orders_placed
+                print(order_response["data"]["transaction_number"])
+                orders_placed.append(Order(order_response["data"]["transaction_number"], stockname, type, quantity))
 
     print("------------------------")
 
@@ -127,6 +137,20 @@ def testSession(nlookup, prob):
     for i in range(nlookup):
         sendLookupAndOrder(random.choice(stocks), prob, conn)
     
+    # retrieve order information all the placed orders
+    print("Checking local information with order information from server")
+    global orders_placed
+    for order in orders_placed:
+        order_id = order.order_id
+        print(f"Running sanity check for order id: {order_id}" )
+        order_response = send_get_request(conn, f'/orders?order-number={order_id}')
+        if order_response is not None and order_response["data"] is not None:
+            assert order_response["data"]["number"] == order_id
+            assert order_response["data"]["name"] == order.stockname
+            assert order_response["data"]["type"] == order.trade_type
+            assert order_response["data"]["quantity"] == order.quantity
+        print(f"Check complete for order id: {order_id}")
+    print("Local information consistent with server")
     conn.close()
     print("Session completed, closing connection")
 
@@ -135,5 +159,7 @@ if __name__ == '__main__':
     # initializing stocks list with a set of stocknames
     stocks = ['stock'+str(i) for i in range(1,11)]
     testNormalWorking()
+    # testSession(10, 100)
+
     print("==================================")
     testSession(config.num_session_requests, config.prob)
