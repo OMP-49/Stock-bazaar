@@ -172,7 +172,10 @@ def testSession(nlookup, prob):
     print("Session completed, closing connection")
 
 
-def Evaluation():
+def PerformanceEvaluation():
+    '''
+    Function to perform the performance evaluation - finds average latencies for differnt types of requests
+    '''
     print("For Performance Evaluation")
     global lookuptime
     global tradetime
@@ -187,7 +190,7 @@ def Evaluation():
     trade_count = 0
     orderlookup_count = 0
     
-    num_session_requests = 10
+    num_session_requests = 500
 
     for prob in [0,0.2,0.4,0.6,0.8,1]:
         print("============================================")
@@ -204,10 +207,44 @@ def Evaluation():
 
         print("============================================")
 
+def CachePerformance():
+    print("Cache Performance evaluation")
+    global stocks
+
+    request_types = ['Lookup', 'Trade','OrderLookup']
+    num_session_requests = 2000
+    totaltime = 0
+    count = 0
+
+    conn = http.client.HTTPConnection(config.frontend_hostname, config.frontend_port)
+    for _ in range(num_session_requests):
+        request_type = random.choice(request_types)
+        if request_type == 'Lookup':
+            stockname = random.choice(stocks)
+            start = time.perf_counter()
+            send_get_request(conn, '/stocks?stockname=' + stockname)
+            end = time.perf_counter()
+            totaltime += end - start
+            count +=1
+        elif request_type == 'Trade':
+            stockname = random.choice(stocks)
+            trade_type = random.choice(['BUY', 'SELL'])
+            quantity = random.choice(list(range(1,config.max_order_quantity)))
+            send_post_request(conn,'/orders', stockname, quantity, trade_type)
+        else:
+            order_id = random.randint(1,200)
+            send_get_request(conn, f'/orders?order-number={order_id}')
+
+    print(f"cache status: {config.enable_cache}")
+    latency_per_req = totaltime/count if count !=0 else 0
+    print('lookup latency: {:.6f} s per request'.format(latency_per_req))
+
+
 if __name__ == '__main__':
     # initializing stocks list with a set of stocknames
     stocks = ['stock'+str(i) for i in range(1,20)]
     testNormalWorking()
     # print("==================================")
     # testSession(config.num_session_requests, config.prob)
-    # Evaluation()
+    # PerformanceEvaluation()
+    # CachePerformance()
