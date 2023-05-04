@@ -1,6 +1,7 @@
 import http.client
 import json
 import random
+import time
 import sys
 sys.path.append('../..')
 from src import config
@@ -22,12 +23,10 @@ def send_get_request(conn, path):
     response = conn.getresponse()       # receive response and convert it to json object
     if response.status == 200:
         response_data = json.loads(response.read().decode())
-        print(
-            f"GET request: {path}\nResponse:{response_data}")   
+        print(f"GET request: {path}\nResponse:{response_data}")   
         return response_data
     else:
-        print(
-            f"GET request: {path}\nResponse: Path not found")
+        print(f"GET request: {path}\nResponse: Path not found")
         return None
 
 def send_post_request(conn, path, stockname, quantity, type):
@@ -54,12 +53,10 @@ def send_post_request(conn, path, stockname, quantity, type):
     response = conn.getresponse()                                                    # receive response and convert it to json object
     if response.status == 200:
         response_data = json.loads(response.read().decode())
-        print(
-            f"POST request: {data}\nResponse:{response_data}")   
+        print(f"POST request: {data}\nResponse:{response_data}")   
         return response_data
     else:
-        print(
-            f"POST request: {path}\nResponse: Path not found")
+        print(f"POST request: {path}\nResponse: Path not found")
         return None
 
 
@@ -105,7 +102,15 @@ def sendLookupAndOrder(stockname, prob, conn):
     :param conn: HTTP connection instance
     '''
 
+    global lookuptime
+    global lookup_count
+    global tradetime
+    global trade_count
+    start = time.perf_counter()
     get_response = send_get_request(conn, '/stocks?stockname=' + stockname)
+    end = time.perf_counter()
+    lookuptime += end - start
+    lookup_count += 1
 
     if 'data' in get_response:
         if (get_response['data']['quantity']>0) and (random.randint(1,100) <= prob*100):
@@ -113,9 +118,14 @@ def sendLookupAndOrder(stockname, prob, conn):
             # we select type and quantity parameters in a random manner and send post request
             type = random.choice(['BUY', 'SELL'])
             quantity = random.choice(list(range(1,config.max_order_quantity)))
+            start = time.perf_counter()
             order_response = send_post_request(conn,'/orders', stockname, quantity, type)
+            end = time.perf_counter()
+            tradetime += end - start
+            trade_count += 1
+
             # store the sent stockname, type, and quantity along with the returned transaction number in a list.
-            if order_response is not None and order_response["data"] is not None:
+            if order_response is not None and "data" in order_response:
                 global orders_placed
                 print(order_response["data"]["transaction_number"])
                 orders_placed.append(Order(order_response["data"]["transaction_number"], stockname, type, quantity))
@@ -130,6 +140,9 @@ def testSession(nlookup, prob):
     :param prob: probability with which an order request is sent after a lookup request - user given parameter
     '''
 
+    global orderlookup_count
+    global orderlookuptime
+
     print("Testing session")
     print("Connecting frontend server on port: ", config.frontend_hostname,":",config.frontend_port)
     conn = http.client.HTTPConnection(config.frontend_hostname, config.frontend_port)
@@ -143,8 +156,12 @@ def testSession(nlookup, prob):
     for order in orders_placed:
         order_id = order.order_id
         print(f"Running sanity check for order id: {order_id}" )
+        start = time.perf_counter()
         order_response = send_get_request(conn, f'/orders?order-number={order_id}')
-        if order_response is not None and order_response["data"] is not None:
+        end = time.perf_counter()
+        orderlookuptime += end - start
+        orderlookup_count += 1
+        if order_response is not None and "data" in order_response:
             assert order_response["data"]["number"] == order_id
             assert order_response["data"]["name"] == order.stockname
             assert order_response["data"]["type"] == order.trade_type
@@ -155,11 +172,42 @@ def testSession(nlookup, prob):
     print("Session completed, closing connection")
 
 
+def Evaluation():
+    print("For Performance Evaluation")
+    global lookuptime
+    global tradetime
+    global orderlookuptime
+    global lookup_count
+    global trade_count
+    global orderlookup_count
+    lookuptime = 0
+    tradetime = 0
+    orderlookuptime = 0
+    lookup_count = 0
+    trade_count = 0
+    orderlookup_count = 0
+    
+    num_session_requests = 10
+
+    for prob in [0,0.2,0.4,0.6,0.8,1]:
+        print("============================================")
+        print(f"For prob: {prob}")
+        testSession(num_session_requests, prob)
+
+        lookup_latency_per_req = lookuptime/lookup_count
+        trade_latency_per_req = tradetime/trade_count if trade_count !=0 else 0
+        orderlookup_latency_per_req = orderlookuptime/orderlookup_count if orderlookup_count !=0 else 0
+
+        print('lookup: {:.6f}s per request'.format(lookup_latency_per_req))
+        print('trade: {:.6f}s per request'.format(trade_latency_per_req))
+        print('orderlookup: {:.6f}s per request'.format(orderlookup_latency_per_req))
+
+        print("============================================")
+
 if __name__ == '__main__':
     # initializing stocks list with a set of stocknames
     stocks = ['stock'+str(i) for i in range(1,20)]
     testNormalWorking()
-    # testSession(10, 100)
-
-    print("==================================")
-    testSession(config.num_session_requests, config.prob)
+    # print("==================================")
+    # testSession(config.num_session_requests, config.prob)
+    # Evaluation()
