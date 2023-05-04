@@ -255,8 +255,6 @@ def subscribe_to_db_updates():
             logger.info(f"Exception occured during subscribing to db updates\nOrder service instance at {hostAddr} is not alive/unavailable\nException: {rpc_error}")
             global leader_id
             leader_id = 0
-            logger.info(f"Resubscribing to db updates")
-            subscribe_to_db_updates()
         else:
             logger.error(f"Failed to subscribe to order updates with exception: {rpc_error}")
             print(rpc_error)
@@ -264,6 +262,8 @@ def subscribe_to_db_updates():
         logger.error(f"Failed to subscribe to order updates with exception: {e}")
 
         print(e)
+    logger.info(f"Resubscribing to db updates")
+    subscribe_to_db_updates()
 
 #TODO: remove the function (not using)
 def save_file():
