@@ -114,11 +114,14 @@ def lookup(stockname):
     '''
     logger.info(f"Sending lookup request for : {stockname}")
     try:
-        #check in cache
-        logger.info(f"Performing lookup on stock: {stockname} in cache")
-        global cache
-        with lock:
-            cached_stock = cache.get(stockname)
+        #check in cache if cache is enabled
+        cached_stock = None
+        if config.enable_cache == 'Y':
+            logger.info(f"Performing lookup on stock: {stockname} in cache")
+            global cache
+            with lock:
+                cached_stock = cache.get(stockname)
+        # if stock present in cache return the response
         if cached_stock is not None:
             response =  {
                 'name' : cached_stock.name,
@@ -126,6 +129,7 @@ def lookup(stockname):
                 'quantity' : cached_stock.volume
             }
             return get_http_response(response)
+        # if cache is enabled or stock not present in cache, send request to backend
         else:
             #call catalog service
             hostAddr = config.catalog_hostname + ':' + str(config.catalog_port)
@@ -134,19 +138,23 @@ def lookup(stockname):
                 lookup_response = stub.Lookup(stocktrade_pb2.LookupRequest(stockname= stockname))
                 logger.info(
                     f"Lookup request: {lookup_response.stockname}, response: Price of stock: {lookup_response.price}, Volume of the stock: {lookup_response.volume}")
+                # send data response if returned price is not -1
                 if lookup_response.price != -1:
                     response =  {
                         'name' : lookup_response.stockname,
                         'price' : lookup_response.price,
                         'quantity' : lookup_response.volume
                     }
+                    # add the retrieved information to cache
                     with lock:
                         cache.put(stockname, stock.Stock(name= lookup_response.stockname, price= lookup_response.price, vol=lookup_response.volume))
                     return get_http_response(response) #prepare http response
+                # send error response if returned price is -1
                 else:
                     return get_http_error_response(404, 'stock not found') #prepare http error response
     except Exception as e:
         logger.error(f"Failed to get lookup response for {stockname} with expception: {e}") 
+    # send internal server error if request failed
     return get_http_error_response(404, 'Internal Server Error')
 
 def trade(stockname, quantity, trade_type):
@@ -182,7 +190,6 @@ def trade(stockname, quantity, trade_type):
             logger.info(f"Failed to process the trade request\nOrder service instance at {hostAddr} is not alive/unavailable\nException: {rpc_error}")
             global leader_id
             leader_id = 0
-            # TODO : Send Error Message Instead
             logger.info(f"Resending trade request...")
             return trade(stockname, quantity, trade_type)
         else:
@@ -253,6 +260,7 @@ def subscribe_to_db_updates():
             print(rpc_error)
     except Exception as e:
         logger.error(f"Failed to subscribe to order updates with exception: {e}")
+
         print(e)
     logger.info(f"Resubscribing to db updates")
     subscribe_to_db_updates()

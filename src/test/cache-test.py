@@ -52,21 +52,21 @@ class TestCaching(unittest.TestCase):
         cache.put("stock_test_2", 2)
 
          #precondition test
-        self.assertTrue(cache.get("stock_test_1") == 1)
         self.assertTrue(cache.get("stock_test_2") == 2)
+        self.assertTrue(cache.get("stock_test_1") == 1)
 
         #Adding more items to cache
         cache.put("stock_test_3", 3)
-        #stock_test_1 should be evicted and stock_test_3 should be present 
+        #stock_test_2 should be evicted and stock_test_3 should be present 
         
         self.assertTrue(cache.get("stock_test_3") == 3)
-        self.assertTrue(cache.get("stock_test_1") == None)
+        self.assertTrue(cache.get("stock_test_2") == None)
 
         cache.put("stock_test_4" , 4)
         cache.put("stock_test_5" , 5)
-        #stock_test_2 and stock_test_3 should be evicted and stock_test_4, stock_test_5 should be present 
+        #stock_test_1 and stock_test_3 should be evicted and stock_test_4, stock_test_5 should be present 
         self.assertTrue(cache.get("stock_test_3") == None)
-        self.assertTrue(cache.get("stock_test_2") == None)
+        self.assertTrue(cache.get("stock_test_1") == None)
         self.assertTrue(cache.get("stock_test_4") == 4)
         self.assertTrue(cache.get("stock_test_5") == 5)
         print(f"Test complete!")
