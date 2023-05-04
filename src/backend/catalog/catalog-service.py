@@ -1,7 +1,5 @@
 from concurrent import futures
 import grpc
-import threading
-import time
 from threading import Lock
 import atexit
 import sys
