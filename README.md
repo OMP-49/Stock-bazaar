@@ -111,19 +111,3 @@ docker-compose down
 Performance tests were run on the application and the graphs and observations are shared in the evaluation document and output document. docs folder also contains design document which gives information about design choices. The test folder contains three files one for each service, which contains the test cases to test that particular service.
 
 &nbsp;
-## Division of Work
-### Vineeth:
-* Implemented Catalog Service
-* Implemented Order Service
-* Co-implemented Client
-* Wrote test cases for Frontend service
-* Worked on docker and virtualization
-* Performed evaluation and updating Readme
-
-### Om:
-* Implemented Frontend service
-* Implemented Proto
-* Co-implemented Client
-* Wrote test cases for Catalog and Order service
-* Worked on docker and virtualization
-* Wrote design document and updating ReadMe
