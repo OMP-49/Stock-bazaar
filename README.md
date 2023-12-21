@@ -1,4 +1,4 @@
-# Lab 2: Asterix and the Microservice Stock Bazaar
+# Asterix and the Microservice Stock Bazaar
 
 Install dependencies: (It is recommended to use a virtual environment.)
 
@@ -8,7 +8,7 @@ pip3 install -r /path/to/requirements.txt
 
 &nbsp;
 
-## Part 1: Implement Your Two-Tiered Stock Bazaar as Microservices
+## Part 1: Two-Tiered Stock Bazaar as Microservices
 
 Set the project parameters through config.py file:
 
@@ -72,7 +72,7 @@ sys.path.append('../../..')
 from src.shared.proto import stocktrade_pb2 as stocktrade__pb2
 ```
 
-## Part 2: Containerize Your Application
+## Part 2: Containerize
 
 To containerize the application, we have created three Dockers for the three microservices. We can run the application either by building and running the dockers manually or use docker-compose to build and run them using docker-compose up and down.
 
