@@ -142,3 +142,4 @@ if __name__ == '__main__':
 
     # calls the funtion to write back to disk when exiting the server
     atexit.register(dump_to_disk)
+    #END
