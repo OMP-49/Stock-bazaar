@@ -1,5 +1,7 @@
 # Asterix and the Microservice Stock Bazaar
 
+We employed a two-tier design (a front-end tier and a back-end tier) for the stock bazaar using microservices at each tier. The front end is implemented as a single microservice, while the back end is implemented as two separate services: a stock catalog service and a stock order service.
+
 Install dependencies: (It is recommended to use a virtual environment.)
 
 ```
